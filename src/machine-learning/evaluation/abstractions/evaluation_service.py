@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic, Dict
 from datetime import timedelta, datetime
 from enum import Enum
-from ...modeling.abstractions.model import Model
+from ...modeling.abstractions.model import Model, TInput, TTarget
 from .evaluation_metric import TEvaluationContext, EvaluationMetric
 from .evaluation_context import EvaluationContext, TModel
-from torch.utils.data import DataLoader
+from dataset_handling.dataloader import DataLoader
 
-class EvaluationService(Generic[TEvaluationContext], ABC):
+class EvaluationService(Generic[TInput, TTarget, TModel, TEvaluationContext], ABC):
     
     @abstractmethod
-    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader, evaluation_metrics: Dict[str, EvaluationMetric[TEvaluationContext]]) -> Dict[str, float]:
+    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[(TInput, TTarget)], evaluation_metrics: Dict[str, EvaluationMetric[TEvaluationContext]]) -> Dict[str, float]:
         pass

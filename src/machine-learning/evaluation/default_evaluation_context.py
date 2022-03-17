@@ -5,7 +5,7 @@ from .abstractions.evaluation_context import *
 from .abstractions.evaluation_metric import *
 from .abstractions.evaluation_service import *
 
-class DefaultEvaluationContext(EvaluationContext[TModel], ABC):
+class DefaultEvaluationContext(EvaluationContext[TTarget, TModel], ABC):
     def __init__(self, model: TModel):
         self.__model: TModel = model
         self.__predictions: List[TTarget] = []

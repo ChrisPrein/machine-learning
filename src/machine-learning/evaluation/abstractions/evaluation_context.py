@@ -4,9 +4,9 @@ from datetime import timedelta, datetime
 from enum import Enum
 from ...modeling.abstractions.model import *
 
-TModel = TypeVar('TModel', Model)
+TModel = TypeVar('TModel', Model[TInput, TTarget])
 
-class EvaluationContext(Generic[TModel], ABC):
+class EvaluationContext(Generic[TTarget, TModel], ABC):
     
     @property
     @abstractmethod

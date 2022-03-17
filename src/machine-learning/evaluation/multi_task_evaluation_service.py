@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 from argparse import ArgumentError
+from dataclasses import dataclass
+import enum
 import inspect
 from typing import TypeVar, List, Generic, Optional, Dict
 from datetime import timedelta, datetime
+
+from numpy import number
 from .abstractions.evaluation_context import *
 from .abstractions.evaluation_metric import *
 from .abstractions.evaluation_service import *
@@ -12,11 +16,16 @@ import asyncio.tasks
 import asyncio.futures
 from torch.utils.data import DataLoader
 
-class MultiTaskEvaluationService(EvaluationService[DefaultEvaluationContext[TModel]], ABC):
-    def __init__(self):
-        self.__semaphore = asyncio.Semaphore(1)
+@dataclass
+class BatchPrediction(Generic[TTarget]):
+    batch_index: number
+    prediction: List[TTarget]
 
-    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader, evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TModel]]]) -> Dict[str, float]:
+class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, DefaultEvaluationContext[TTarget, TModel]], ABC):
+    def __init__(self, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+        self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
+
+    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[(TInput, TTarget)], evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TModel]]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
 
@@ -28,12 +37,15 @@ class MultiTaskEvaluationService(EvaluationService[DefaultEvaluationContext[TMod
 
         evaluation_context: DefaultEvaluationContext[TModel] = DefaultEvaluationContext[TModel](model)
 
-        for batch_index, batch in enumerate(evaluation_data_loader):
-            evaluation_context.predictions.append(model.predict_batch(batch))
+        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(executor=None, func=model.predict_batch, args=batch) for batch in evaluation_data_loader]
+        completed, pending = asyncio.wait(prediction_futures)
 
-        result: EvaluationResult = EvaluationResult[TModel, TMember, TData](dict(), self.config.evaluation_metrics, model, model_result)
+        for t in completed:
+            evaluation_context.predictions.append(t.result()) 
 
-        for evaluation_metric in self.config.evaluation_metrics:
-            result.evaluation_score[evaluation_metric.name] = evaluation_metric.calculate_score(model_result, data)
+        result: Dict[str, float] = {}
+
+        for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
+            result[name] = evaluation_metric.calculate_score(evaluation_context)
 
         return result
