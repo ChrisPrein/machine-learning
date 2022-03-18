@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic
-from datetime import timedelta, datetime
-from enum import Enum
-from ...modeling.abstractions.model import *
+from ...modeling.abstractions.model import Model, TInput, TTarget
 
-TModel = TypeVar('TModel', Model[TInput, TTarget])
+TModel = TypeVar('TModel', bound=Model)
 
 class EvaluationContext(Generic[TTarget, TModel], ABC):
     

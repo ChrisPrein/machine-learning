@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic, Optional, Dict
-from datetime import timedelta, datetime
-from .abstractions.evaluation_context import *
-from .abstractions.evaluation_metric import *
-from .abstractions.evaluation_service import *
+from ..modeling.abstractions.model import TTarget, TInput
+from .abstractions.evaluation_context import EvaluationContext, TModel
 
 class DefaultEvaluationContext(EvaluationContext[TTarget, TModel], ABC):
     def __init__(self, model: TModel):

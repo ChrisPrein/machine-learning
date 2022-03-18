@@ -1,41 +1,67 @@
+from asyncio import coroutine
+import asyncio
 from dataclasses import dataclass
 from re import S
 import unittest
 from unittest.mock import patch
 from torch.utils.data import Dataset
 from dataset_handling.dataloader import DataLoader
-from typing import List
+from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
-
-@dataclass
-class SampleData:
-    firstname: str
-    lastname: str
+from machine_learning.evaluation.abstractions.evaluation_metric import EvaluationMetric
+from machine_learning.evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
+from machine_learning.modeling.abstractions.model import Model, TInput, TTarget
 
 class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
         config = {'__getitem__'}
         fake = Faker()
 
-        self.samples: List[SampleData] = [SampleData(fake.first_name(), fake.last_name()) for i in range(10)]
+        self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(10)]
+
+        # self.dataset_patcher = patch('torch.utils.data.Dataset')
+        # self.dataset: Dataset[SampleData] = self.dataset_patcher.start()
+        # self.dataset.__getitem__.return_value = random.choice(self.samples)
+        # self.dataset.__len__.return_value = self.samples.__len__()
+
+        # self.dataloader: DataLoader[SampleData] = DataLoader[SampleData](self.dataset, batch_size=1, shuffle=True)
+
+        self.model_patcher = patch('machine_learning.modeling.abstractions.model.Model', new=Model[str, str])
+        self.evaluation_metric_1_patcher = patch('machine_learning.evaluation.abstractions.evaluation_metric.EvaluationMetric', new=EvaluationMetric[str])
+        self.evaluation_metric_2_patcher = patch('machine_learning.evaluation.abstractions.evaluation_metric.EvaluationMetric', new=EvaluationMetric[str])
+        self.datalaoder_patcher = patch('dataset_handling.dataloader.DataLoader', new=DataLoader[Tuple[str, str]])
+
+        self.model: Model[str, str] = self.model_patcher.start()
+
+        self.model.predict_batch.return_value = [fake.last_name() for i in range(10)]
+
+        self.evaluation_metric_1: EvaluationMetric[str] = self.evaluation_metric_1_patcher.start()
+
+        self.evaluation_metric_1.calculate_score.return_value = [fake.pyfloat(positive=True) for i in range(10)]
+
+        self.evaluation_metric_2: EvaluationMetric[str] = self.evaluation_metric_2_patcher.start()
+
+        self.evaluation_metric_2.calculate_score.return_value = [fake.pyfloat(positive=True) for i in range(10)]
 
         self.dataset_patcher = patch('torch.utils.data.Dataset')
-        self.dataset: Dataset[SampleData] = self.dataset_patcher.start()
+        self.dataset: Dataset[Tuple[str, str]] = self.dataset_patcher.start()
         self.dataset.__getitem__.return_value = random.choice(self.samples)
         self.dataset.__len__.return_value = self.samples.__len__()
 
-        self.dataloader: DataLoader[SampleData] = DataLoader[SampleData](self.dataset, batch_size=1, shuffle=True)
+        self.dataloader: DataLoader[Tuple[str, str]] = DataLoader[Tuple[str, str]](self.dataset, batch_size=1, shuffle=True)
+
+        self.event_loop = asyncio.get_event_loop()
+
+        self.evaluation_service: MultiTaskEvaluationService[str, str, Model[str, str]] = MultiTaskEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop)
 
     def tearDown(self):
-        self.dataset_patcher.stop()
+        self.datalaoder_patcher.stop()
 
-    def test_iteration_should_return_typed_sample(self):
-        sample: List[SampleData] = next(iter(self.dataloader))
+    def test_evaluate_valid_model_metrics_and_dataloader_should_return_results_for_each_metric(self):
+        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = self.evaluation_service.evaluate(model = self.model, evaluation_data_loader=self.dataloader, 
+                    evaluation_metrics={'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
-        assert not sample is None
+        result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
 
-    def test_iteration_iterate_over_all_samples_twice_should_return_all_samples_twice(self):
-        batches: List[List[SampleData]] = [batch for batch in self.dataloader]
-
-        assert len(batches) == len(self.samples)
+        assert len(result.items()) == 2

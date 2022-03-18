@@ -3,18 +3,23 @@ from argparse import ArgumentError
 from dataclasses import dataclass
 import enum
 import inspect
-from typing import TypeVar, List, Generic, Optional, Dict
+from typing import TypeVar, List, Generic, Optional, Dict, Tuple
 from datetime import timedelta, datetime
+from unittest.mock import patch
 
 from numpy import number
-from .abstractions.evaluation_context import *
-from .abstractions.evaluation_metric import *
-from .abstractions.evaluation_service import *
-from .default_evaluation_context import *
+from ..modeling.abstractions.model import TInput, TTarget
+from .abstractions.evaluation_metric import EvaluationMetric
+from .abstractions.evaluation_service import EvaluationService
+from .abstractions.evaluation_context import TModel
+from .default_evaluation_context import DefaultEvaluationContext
 import asyncio
 import asyncio.tasks
 import asyncio.futures
-from torch.utils.data import DataLoader
+from dataset_handling.dataloader import DataLoader
+
+import nest_asyncio
+nest_asyncio.apply()
 
 @dataclass
 class BatchPrediction(Generic[TTarget]):
@@ -25,7 +30,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Defa
     def __init__(self, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
 
-    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[(TInput, TTarget)], evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TModel]]]) -> Dict[str, float]:
+    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TTarget, TModel]]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
 
@@ -35,10 +40,10 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Defa
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        evaluation_context: DefaultEvaluationContext[TModel] = DefaultEvaluationContext[TModel](model)
+        evaluation_context: DefaultEvaluationContext[TTarget, TModel] = DefaultEvaluationContext[TTarget, TModel](model)
 
-        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(executor=None, func=model.predict_batch, args=batch) for batch in evaluation_data_loader]
-        completed, pending = asyncio.wait(prediction_futures)
+        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, model.predict_batch, [sample[0] for sample in batch]) for batch in evaluation_data_loader]
+        completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
 
         for t in completed:
             evaluation_context.predictions.append(t.result()) 
