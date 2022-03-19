@@ -15,7 +15,6 @@ from ..modeling.abstractions.model import Model, TInput, TTarget
 
 class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
-        config = {'__getitem__'}
         fake = Faker()
 
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(10)]

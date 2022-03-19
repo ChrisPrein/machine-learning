@@ -23,7 +23,6 @@ def accuracy(context: EvaluationContext[float, float, Model[float, float]]) -> f
 
 class CustomEvaluationMetricTestCase(unittest.TestCase):
     def setUp(self):
-        config = {'__getitem__'}
         fake = Faker()
 
         self.evaluation_context_patcher = patch('machine_learning.evaluation.abstractions.evaluation_context.EvaluationContext', new=EvaluationContext[float, float, Model[float, float]])

@@ -10,7 +10,6 @@ class PytorchModel(Model[TInput, TTarget], ABC):
         self.loss_function: nn.Module = loss_function
         self.optimizer: torch.optim.Optimizer = optimizer
 
-    @abstractmethod
     def train(self, input: TInput, target: TTarget):
         self.inner_module.train(True)
 
@@ -27,7 +26,6 @@ class PytorchModel(Model[TInput, TTarget], ABC):
         self.inner_module.train(False)
 
 
-    @abstractmethod
     def train_batch(self, input_batch: List[TInput], target_batch: List[TTarget]):
         self.inner_module.train(True)
         
@@ -43,13 +41,11 @@ class PytorchModel(Model[TInput, TTarget], ABC):
         
         self.inner_module.train(False)
 
-    @abstractmethod
     def predict(self, input: TInput) -> TTarget:
         self.inner_module.train(False)
 
         return self.inner_module(input)
 
-    @abstractmethod
     def predict_batch(self, input_batch: List[TInput]) -> List[TTarget]:
         self.inner_module.train(False)
 
