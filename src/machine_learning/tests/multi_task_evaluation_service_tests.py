@@ -3,15 +3,15 @@ import asyncio
 from dataclasses import dataclass
 from re import S
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from torch.utils.data import Dataset
 from dataset_handling.dataloader import DataLoader
 from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
-from machine_learning.evaluation.abstractions.evaluation_metric import EvaluationMetric
-from machine_learning.evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
-from machine_learning.modeling.abstractions.model import Model, TInput, TTarget
+from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
+from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
+from ..modeling.abstractions.model import Model, TInput, TTarget
 
 class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
@@ -20,13 +20,6 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(10)]
 
-        # self.dataset_patcher = patch('torch.utils.data.Dataset')
-        # self.dataset: Dataset[SampleData] = self.dataset_patcher.start()
-        # self.dataset.__getitem__.return_value = random.choice(self.samples)
-        # self.dataset.__len__.return_value = self.samples.__len__()
-
-        # self.dataloader: DataLoader[SampleData] = DataLoader[SampleData](self.dataset, batch_size=1, shuffle=True)
-
         self.model_patcher = patch('machine_learning.modeling.abstractions.model.Model', new=Model[str, str])
         self.evaluation_metric_1_patcher = patch('machine_learning.evaluation.abstractions.evaluation_metric.EvaluationMetric', new=EvaluationMetric[str])
         self.evaluation_metric_2_patcher = patch('machine_learning.evaluation.abstractions.evaluation_metric.EvaluationMetric', new=EvaluationMetric[str])
@@ -34,20 +27,20 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.model: Model[str, str] = self.model_patcher.start()
 
-        self.model.predict_batch.return_value = [fake.last_name() for i in range(10)]
+        self.model.predict_batch = Mock(return_value=[fake.last_name() for i in range(10)])
 
         self.evaluation_metric_1: EvaluationMetric[str] = self.evaluation_metric_1_patcher.start()
 
-        self.evaluation_metric_1.calculate_score.return_value = [fake.pyfloat(positive=True) for i in range(10)]
+        self.evaluation_metric_1.calculate_score = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
 
         self.evaluation_metric_2: EvaluationMetric[str] = self.evaluation_metric_2_patcher.start()
 
-        self.evaluation_metric_2.calculate_score.return_value = [fake.pyfloat(positive=True) for i in range(10)]
+        self.evaluation_metric_2.calculate_score = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
 
         self.dataset_patcher = patch('torch.utils.data.Dataset')
         self.dataset: Dataset[Tuple[str, str]] = self.dataset_patcher.start()
-        self.dataset.__getitem__.return_value = random.choice(self.samples)
-        self.dataset.__len__.return_value = self.samples.__len__()
+        self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
+        self.dataset.__len__ = Mock(return_value=self.samples.__len__())
 
         self.dataloader: DataLoader[Tuple[str, str]] = DataLoader[Tuple[str, str]](self.dataset, batch_size=1, shuffle=True)
 

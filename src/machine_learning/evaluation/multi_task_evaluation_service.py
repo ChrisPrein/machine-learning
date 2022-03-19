@@ -42,7 +42,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Defa
 
         evaluation_context: DefaultEvaluationContext[TTarget, TModel] = DefaultEvaluationContext[TTarget, TModel](model)
 
-        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, model.predict_batch, [sample[0] for sample in batch]) for batch in evaluation_data_loader]
+        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: model.predict_batch(input_batch=[sample[0] for sample in batch])) for batch in evaluation_data_loader]
         completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
 
         for t in completed:
@@ -51,6 +51,6 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Defa
         result: Dict[str, float] = {}
 
         for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
-            result[name] = evaluation_metric.calculate_score(evaluation_context)
+            result[name] = evaluation_metric.calculate_score(context=evaluation_context)
 
         return result
