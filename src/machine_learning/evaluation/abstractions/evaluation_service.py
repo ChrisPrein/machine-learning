@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic, Dict, Tuple
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from .evaluation_metric import TEvaluationContext, EvaluationMetric
-from .evaluation_context import EvaluationContext, TModel
+from .evaluation_context import TModel
 from dataset_handling.dataloader import DataLoader
 
 class EvaluationService(Generic[TInput, TTarget, TModel, TEvaluationContext], ABC):

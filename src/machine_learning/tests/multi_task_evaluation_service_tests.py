@@ -31,11 +31,11 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.evaluation_metric_1: EvaluationMetric[str] = self.evaluation_metric_1_patcher.start()
 
-        self.evaluation_metric_1.calculate_score = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
+        self.evaluation_metric_1.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.evaluation_metric_2: EvaluationMetric[str] = self.evaluation_metric_2_patcher.start()
 
-        self.evaluation_metric_2.calculate_score = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
+        self.evaluation_metric_2.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.dataset_patcher = patch('torch.utils.data.Dataset')
         self.dataset: Dataset[Tuple[str, str]] = self.dataset_patcher.start()

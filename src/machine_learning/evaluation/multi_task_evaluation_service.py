@@ -21,16 +21,11 @@ from dataset_handling.dataloader import DataLoader
 import nest_asyncio
 nest_asyncio.apply()
 
-@dataclass
-class BatchPrediction(Generic[TTarget]):
-    batch_index: number
-    prediction: List[TTarget]
-
-class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, DefaultEvaluationContext[TTarget, TModel]], ABC):
+class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, DefaultEvaluationContext[TInput, TTarget, TModel]], ABC):
     def __init__(self, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
 
-    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TTarget, TModel]]]) -> Dict[str, float]:
+    async def evaluate(self, model: TModel, evaluation_data_loader: DataLoader[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[DefaultEvaluationContext[TInput, TTarget, TModel]]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
 
@@ -40,13 +35,13 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Defa
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        evaluation_context: DefaultEvaluationContext[TTarget, TModel] = DefaultEvaluationContext[TTarget, TModel](model)
+        evaluation_context: DefaultEvaluationContext[TInput, TTarget, TModel] = DefaultEvaluationContext[TInput, TTarget, TModel](model)
 
         prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: model.predict_batch(input_batch=[sample[0] for sample in batch])) for batch in evaluation_data_loader]
         completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
 
         for t in completed:
-            evaluation_context.predictions.append(t.result()) 
+            evaluation_context.predictions.extend(t.result()) 
 
         result: Dict[str, float] = {}
 
