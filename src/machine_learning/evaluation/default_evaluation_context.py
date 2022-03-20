@@ -4,9 +4,9 @@ from ..modeling.abstractions.model import TTarget, TInput
 from .abstractions.evaluation_context import EvaluationContext, Prediction, TModel
 
 class DefaultEvaluationContext(EvaluationContext[TInput, TTarget, TModel], ABC):
-    def __init__(self, model: TModel):
+    def __init__(self, model: TModel, predictions: List[Prediction[TInput, TTarget]] = []):
         self.__model: TModel = model
-        self.__predictions: List[Prediction[TInput, TTarget]] = []
+        self.__predictions: List[Prediction[TInput, TTarget]] = predictions
 
     @property
     def model(self) -> TModel:

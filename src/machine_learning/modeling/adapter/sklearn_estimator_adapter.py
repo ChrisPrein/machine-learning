@@ -9,14 +9,17 @@ class SkleanEstimatorAdapter(Generic[TModel], BaseEstimator):
         self.sk_params = sk_params
         self.prototype_model: TModel = prototype_model
         self.model: TModel = self.prototype_model.__class__(self.sk_params)
+        # self.model: TModel = copy.deepcopy(self.prototype_model)
 
     def fit(self, X, y, **kwargs):
-        self.model.train(X, y)
+
+        for input, target in zip(X, y):
+            self.model.train(input, target)
         
         return self
 
     def predict(self, X):
-        return self.model.predict(X)
+        return [self.model.predict(input) for input in X]
 
     def get_params(self, **params):
         res = copy.deepcopy(self.sk_params)

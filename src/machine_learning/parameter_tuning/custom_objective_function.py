@@ -11,13 +11,16 @@ class CustomObjectiveFunction(ObjectiveFunction[TEvaluationContext]):
 
         self.expression: Callable[[TEvaluationContext], float]
 
-        if isinstance(expression, Callable[[TEvaluationContext], float]):
-            self.expression = expression
-        else:
+        if isinstance(expression, EvaluationMetric):
             self.expression = expression.calculate_score
+        else:
+            self.expression = expression
 
         self.__optimization_type: OptimizationType = optimization_type
 
     @property
     def optimization_type(self) -> OptimizationType:
         return self.__optimization_type
+
+    def calculate_score(self, context: TEvaluationContext) -> float:
+        return self.expression(context)

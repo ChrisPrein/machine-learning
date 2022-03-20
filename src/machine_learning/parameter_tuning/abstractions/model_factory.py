@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, List
+from typing import Any, Dict, Generic
 
 from ...evaluation.abstractions.evaluation_context import TModel
-
 
 class ModelFactory(Generic[TModel], ABC):
 

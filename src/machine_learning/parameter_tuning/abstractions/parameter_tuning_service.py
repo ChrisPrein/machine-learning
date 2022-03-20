@@ -13,5 +13,5 @@ from ...evaluation.abstractions.evaluation_metric import TEvaluationContext
 class ParameterTuningService(Generic[TInput, TTarget, TModel, TEvaluationContext], ABC):
 
     @abstractmethod
-    async def search(self, model_factory: Union[ModelFactory[TModel], Callable[[Dict[str, Any]], TModel]], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]]) -> Dict[str, Any]:
+    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]], primary_objective: str) -> Dict[str, Any]:
         pass
