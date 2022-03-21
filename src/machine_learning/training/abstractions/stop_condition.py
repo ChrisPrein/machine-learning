@@ -3,11 +3,17 @@ from typing import TypeVar, List, Generic
 from datetime import timedelta, datetime
 
 from numpy import number
+
+from .training_context import TrainingContext
 from ...modeling.abstractions.model import Model
 
-TModel = TypeVar('TModel', Model)
+TTrainingContext = TypeVar('TTrainingContext', TrainingContext)
 
-class StopCondition(Generic[TModel], ABC):
+class StopCondition(Generic[TTrainingContext], ABC):
     @abstractmethod
-    def is_satisfied(self, model: TModel, epoch: number, iteration: number) -> bool:
+    def reset(self):
+        pass
+
+    @abstractmethod
+    def is_satisfied(self, context: TTrainingContext) -> bool:
         pass
