@@ -51,7 +51,7 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
         self.datalaoder_patcher.stop()
 
     def test_evaluate_valid_model_metrics_and_dataloader_should_return_results_for_each_metric(self):
-        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = self.evaluation_service.evaluate(model = self.model, evaluation_data_loader=self.dataloader, 
+        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = self.evaluation_service.evaluate(model = self.model, evaluation_dataset=self.dataloader, 
                     evaluation_metrics={'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)

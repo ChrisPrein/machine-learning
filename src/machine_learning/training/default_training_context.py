@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic, Optional, Dict
 
-from .abstractions.training_context import TrainingContext, TModel, Loss
+from .abstractions.training_context import TrainingContext, TModel, Score
 from ..modeling.abstractions.model import TTarget, TInput
 
 class DefaultTrainingContext(TrainingContext[TModel], ABC):
-    def __init__(self, model: TModel):
+    def __init__(self, model: TModel, objectives: List[str], primary_objective: str):
         self.__model: TModel = model
         self.__current_epoch: int = 0
         self.__current_iteration: int = 0
-        self.__loss: List[Loss] = []
+        self.__primary_objective: str = primary_objective
+        self.__scores: Dict[str, List[Score]] = {objective: [] for objective in objectives}
 
     @property
     def model(self) -> TModel:
@@ -25,8 +26,13 @@ class DefaultTrainingContext(TrainingContext[TModel], ABC):
 
     @property
     @abstractmethod
-    def loss(self) -> List[Loss]:
-        return self.__loss
+    def primary_scores(self) -> List[Score]:
+        return self.__scores[self.__primary_objective]
+
+    @property
+    @abstractmethod
+    def scores(self) -> Dict[str, List[Score]]:
+        return self.__scores
 
     @model.setter
     def model(self, value: TModel):

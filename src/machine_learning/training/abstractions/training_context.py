@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeVar, List, Generic
+from typing import TypeVar, List, Generic, Dict
 from ...modeling.abstractions.model import Model, TInput, TTarget
+from ...parameter_tuning.abstractions.objective_function import OptimizationType
 
 TModel = TypeVar('TModel', bound=Model)
 
 @dataclass
-class Loss:
+class Score:
     epoch: int
     iteration: int
-    loss: float
+    score: float
+    optimization_type: OptimizationType
 
 class TrainingContext(Generic[TModel], ABC):
     
@@ -30,5 +32,10 @@ class TrainingContext(Generic[TModel], ABC):
 
     @property
     @abstractmethod
-    def loss(self) -> List[Loss]:
+    def primary_scores(self) -> List[Score]:
+        pass
+
+    @property
+    @abstractmethod
+    def scores(self) -> List[Dict[Score]]:
         pass
