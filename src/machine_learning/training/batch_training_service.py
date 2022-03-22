@@ -3,11 +3,14 @@ from argparse import ArgumentError
 from dataclasses import dataclass
 import enum
 import inspect
+from logging import Logger
 from typing import TypeVar, List, Generic, Optional, Dict, Tuple
 from datetime import timedelta, datetime
 from unittest.mock import patch
 
 from numpy import number
+
+from .default_training_context import DefaultTrainingContext
 
 from .abstractions.stop_condition import StopCondition
 
@@ -24,8 +27,36 @@ import nest_asyncio
 nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingContext[TModel]], ABC):
-    def __init__(self, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, logger: Logger, batch_size: Optional[int], drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, max_iterations: int = 10000):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
+        self.__max_epochs: int = max_epochs
+        self.__max_iterations: int = max_iterations
+        self.__batch_size: Optional[int] = batch_size
+        self.__drop_last: bool = drop_last
+        self.__logger: Logger = Logger
+
+    def is_any_stop_condition_satisfied(self, training_context: DefaultTrainingContext[TModel], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]]) -> bool:
+        self.__logger.info("Checking stop conditions.")
+
+        is_any_satisfied: bool = False
+
+        if training_context.current_epoch > self.__max_epochs: 
+            self.__logger.info("Max number of epochs reached.")
+            is_any_satisfied = True
+        elif training_context.current_iteration > self.__max_iterations:
+            self.__logger.info("Max number of iterations reached.")
+        else:
+            for key, condition in stop_conditions.items():
+                is_any_satisfied |= condition.is_satisfied(training_context)
+
+                if(is_any_satisfied):
+                    self.__logger('Condition named "{key}" is satisfied'.format(key=key))
+
+                break
+
+        self.__logger.info("Done checking stop conditions.")
+
+        return is_any_satisfied
 
     async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]]) -> TModel:
         if model is None:
@@ -37,17 +68,19 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
         if stop_conditions is None:
             raise ValueError("stop_conditions")
 
-        evaluation_context: DefaultEvaluationContext[TInput, TTarget, TModel] = DefaultEvaluationContext[TInput, TTarget, TModel](model)
+        batch_size: int = len(dataset) if self.__batch_size is None else self.__batch_size
 
-        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: model.predict_batch(input_batch=[sample[0] for sample in batch])) for batch in evaluation_data_loader]
-        completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
+        evaluation_context: DefaultTrainingContext[TModel] = DefaultTrainingContext[TModel](model)
+        data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=batch_size, drop_last=self.__drop_last)
 
-        for t in completed:
-            evaluation_context.predictions.extend(t.result()) 
+        self.__logger.info("Starting training loop.")
 
-        result: Dict[str, float] = {}
+        while not self.is_any_stop_condition_satisfied(training_context=evaluation_context, stop_conditions=stop_conditions):
+            for batch_index, batch in enumerate(data_loader):
+                inputs: List[TInput] = [value[0] for value in batch]
+                targets: List[TTarget] = [value[1] for value in batch]
+                model.train_batch(input_batch=inputs, target_batch=targets)
 
-        for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
-            result[name] = evaluation_metric.calculate_score(context=evaluation_context)
+        self.__logger.info("Finished training loop.")
 
-        return result
+        return model
