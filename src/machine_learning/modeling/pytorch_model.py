@@ -4,7 +4,7 @@ from .abstractions.model import Model, TInput, TTarget
 import torch
 import torch.nn as nn
 
-class PytorchModel(Model[TInput, TTarget], ABC):
+class PytorchModel(Model[TInput, TTarget]):
     def __init__(self, pytorch_module: nn.Module, loss_function: nn.Module, optimizer: torch.optim.Optimizer):
         self.inner_module: nn.Module = pytorch_module
         self.loss_function: nn.Module = loss_function

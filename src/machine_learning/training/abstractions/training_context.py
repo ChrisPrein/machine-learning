@@ -37,5 +37,5 @@ class TrainingContext(Generic[TModel], ABC):
 
     @property
     @abstractmethod
-    def scores(self) -> List[Dict[Score]]:
+    def scores(self) -> List[Dict[str, Score]]:
         pass

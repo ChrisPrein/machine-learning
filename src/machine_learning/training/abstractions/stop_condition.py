@@ -7,7 +7,7 @@ from numpy import number
 from .training_context import TrainingContext
 from ...modeling.abstractions.model import Model
 
-TTrainingContext = TypeVar('TTrainingContext', TrainingContext)
+TTrainingContext = TypeVar('TTrainingContext', bound=TrainingContext)
 
 class StopCondition(Generic[TTrainingContext], ABC):
     @abstractmethod
