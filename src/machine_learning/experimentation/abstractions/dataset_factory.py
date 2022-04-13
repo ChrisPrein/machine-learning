@@ -5,9 +5,10 @@ from experimentation.experiment.abstractions.experimentation_service import Expe
 
 from ...evaluation.abstractions.evaluation_context import TModel
 from ...modeling.abstractions.model import Model, TInput, TTarget
+from ..machine_learning_experiment_settings import MachineLearningExperimentSettings
 
-class DatasetFactory(Generic[TInput, TTarget, TExperimentSettings], ABC):
+class DatasetFactory(Generic[TInput, TTarget], ABC):
 
     @abstractmethod
-    def create(self, settings: TExperimentSettings) -> Dict[str, Dataset[Tuple[TInput, TTarget]]]:
+    def create(self, settings: MachineLearningExperimentSettings) -> Dict[str, Dataset[Tuple[TInput, TTarget]]]:
         pass

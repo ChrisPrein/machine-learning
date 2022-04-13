@@ -22,20 +22,21 @@ from .default_machine_learning_experiment_result import DefaultMachineLearningEx
 from .abstractions.evaluation_service_factory import EvaluationServiceFactory
 from .abstractions.model_factory import ModelFactory
 from .abstractions.training_service_factory import TrainingServiceFactory
-from .abstractions.dataset_factory import DatasetFactoryFactory
+from .abstractions.dataset_factory import DatasetFactory
+from .machine_learning_experiment_settings import MachineLearningExperimentSettings
 
 nest_asyncio.apply()
 
-class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TModel], ExperimentationService[TExperimentSettings, DefaultMachineLearningExperimentResult[TModel]]):
+class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TModel], ExperimentationService[MachineLearningExperimentSettings, DefaultMachineLearningExperimentResult[TModel]]):
     def __init__(self, logger: Logger,
-    model_factory: ModelFactory[TModel, TExperimentSettings], 
-    training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel, TExperimentSettings], 
-    evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel, TExperimentSettings], 
-    training_dataset_factory: DatasetFactoryFactory[TInput, TTarget, TExperimentSettings], 
-    test_dataset_factory: DatasetFactoryFactory[TInput, TTarget, TExperimentSettings],
-    evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel, TExperimentSettings],
-    objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel, TExperimentSettings],
-    stop_condition_factory: StopConditionFactory[TModel, TExperimentSettings],
+    model_factory: ModelFactory[TModel], 
+    training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel], 
+    evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel], 
+    training_dataset_factory: DatasetFactory[TInput, TTarget], 
+    test_dataset_factory: DatasetFactory[TInput, TTarget],
+    evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel],
+    objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel],
+    stop_condition_factory: StopConditionFactory[TModel],
     event_loop: Optional[asyncio.AbstractEventLoop] = None):
 
         if logger is None:
@@ -67,16 +68,16 @@ class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TMod
 
         self.__logger: Logger = Logger
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
-        self.__model_factory: ModelFactory[TModel, TExperimentSettings] = model_factory
-        self.__training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel, TExperimentSettings] = training_service_factory
-        self.__evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel, TExperimentSettings] = evaluation_service_factory
-        self.__training_dataset_factory: DatasetFactoryFactory[TInput, TTarget, TExperimentSettings] = training_dataset_factory
-        self.__test_dataset_factory: DatasetFactoryFactory[TInput, TTarget, TExperimentSettings] = test_dataset_factory
-        self.__evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel, TExperimentSettings] = test_dataset_factory
-        self.__objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel, TExperimentSettings] = test_dataset_factory
-        self.__stop_condition_factory: StopConditionFactory[TModel, TExperimentSettings] = test_dataset_factory
+        self.__model_factory: ModelFactory[TModel] = model_factory
+        self.__training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel] = training_service_factory
+        self.__evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel] = evaluation_service_factory
+        self.__training_dataset_factory: DatasetFactory[TInput, TTarget] = training_dataset_factory
+        self.__test_dataset_factory: DatasetFactory[TInput, TTarget] = test_dataset_factory
+        self.__evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel] = test_dataset_factory
+        self.__objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel] = test_dataset_factory
+        self.__stop_condition_factory: StopConditionFactory[TModel] = test_dataset_factory
 
-    async def run_experiment(self, experiment_settings: TExperimentSettings) -> DefaultMachineLearningExperimentResult[TModel]:
+    async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings) -> DefaultMachineLearningExperimentResult[TModel]:
         model: TModel = self.__model_factory.create(experiment_settings)
         
         training_service: TrainingService[TInput, TTarget, TModel, TrainingContext[TModel], EvaluationContext[TInput, TTarget, TModel]] = self.__training_service_factory.create(experiment_settings)
@@ -94,12 +95,12 @@ class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TMod
 
         return DefaultMachineLearningExperimentResult[TModel](model, scores)
 
-    async def __run_experiment(self, experiment_settings: Tuple[str, TExperimentSettings]) -> Tuple[str, DefaultMachineLearningExperimentResult[TModel]]:
+    async def __run_experiment(self, experiment_settings: Tuple[str, MachineLearningExperimentSettings]) -> Tuple[str, DefaultMachineLearningExperimentResult[TModel]]:
         result = await self.run_experiment(experiment_settings[1])
 
         return (experiment_settings[0], result)
 
-    async def run_experiments(self, experiment_settings: Dict[str, TExperimentSettings]) -> Dict[str, DefaultMachineLearningExperimentResult[TModel]]:
+    async def run_experiments(self, experiment_settings: Dict[str, MachineLearningExperimentSettings]) -> Dict[str, DefaultMachineLearningExperimentResult[TModel]]:
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, DefaultMachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
         completed, pending = await asyncio.wait(experiment_tasks)

@@ -7,9 +7,10 @@ from ...modeling.abstractions.model import Model, TInput, TTarget
 from ...evaluation.abstractions.evaluation_service import EvaluationService
 from ...evaluation.abstractions.evaluation_metric import EvaluationMetric
 from ...parameter_tuning.abstractions.objective_function import ObjectiveFunction
+from ..machine_learning_experiment_settings import MachineLearningExperimentSettings
 
-class ObjectiveFunctionFactory(Generic[TInput, TTarget, TModel, TExperimentSettings], ABC):
+class ObjectiveFunctionFactory(Generic[TInput, TTarget, TModel], ABC):
 
     @abstractmethod
-    def create(self, settings: TExperimentSettings) -> Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]]:
+    def create(self, settings: MachineLearningExperimentSettings) -> Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]]:
         pass
