@@ -4,11 +4,17 @@ from dataclasses import dataclass
 import enum
 import inspect
 from logging import Logger
-from typing import TypeVar, List, Generic, Optional, Dict, Tuple
+from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
 from datetime import timedelta, datetime
 from unittest.mock import patch
-
 from numpy import number
+import asyncio
+import asyncio.tasks
+import asyncio.futures
+from dataset_handling.dataloader import DataLoader
+from torch.utils.data import Dataset, random_split
+from multidispatch import multimethod, multifunction
+import nest_asyncio
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..evaluation.abstractions.evaluation_context import EvaluationContext
@@ -17,15 +23,9 @@ from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from .default_training_context import DefaultTrainingContext
 from .abstractions.stop_condition import StopCondition
 from .abstractions.training_context import Score, TModel, TrainingContext
-from ..modeling.abstractions.model import TInput, TTarget
+from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
-import asyncio
-import asyncio.tasks
-import asyncio.futures
-from dataset_handling.dataloader import DataLoader
-from torch.utils.data import Dataset, random_split
 
-import nest_asyncio
 nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingContext[TModel], EvaluationContext[TInput, TTarget, TModel]], ABC):
@@ -65,6 +65,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
         self.__logger.info("Finished checking stop conditions.")
         return is_any_satisfied
 
+    @multimethod(Model, Dataset, dict, dict, str)
     async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
         if model is None:
             raise ValueError("model")
@@ -106,5 +107,17 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
                 training_context.scores[key].append(Score(epoch=training_context.current_epoch, iteration=training_context.current_iteration, score=evaluation_score, optimization_type=objective_functions[key].optimization_type))
 
         self.__logger.info("Finished training loop.")
+
+        return model
+
+    async def __train(self, model: TModel, dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
+        result = await self.train(model, dataset[1], stop_conditions, objective_functions, primary_objective)
+
+        return result
+
+    @train.dispatch(Model, dict, dict, dict, str)
+    async def train(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
+        for dataset in datasets:
+            model = await self.__train(model, dataset, stop_conditions, objective_functions, primary_objective)
 
         return model

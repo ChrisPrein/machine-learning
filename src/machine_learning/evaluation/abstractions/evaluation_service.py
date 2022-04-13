@@ -4,9 +4,14 @@ from ...modeling.abstractions.model import Model, TInput, TTarget
 from .evaluation_metric import TEvaluationContext, EvaluationMetric
 from .evaluation_context import TModel
 from torch.utils.data.dataset import Dataset
+from multipledispatch import dispatch
 
 class EvaluationService(Generic[TInput, TTarget, TModel, TEvaluationContext], ABC):
     
     @abstractmethod
     async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[TEvaluationContext]]) -> Dict[str, float]:
+        pass
+
+    @abstractmethod
+    async def evaluate(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TEvaluationContext]]) -> Dict[str, Dict[str, float]]:
         pass

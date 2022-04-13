@@ -14,3 +14,7 @@ class TrainingService(Generic[TInput, TTarget, TModel, TTrainingContext, TEvalua
     @abstractmethod
     async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TTrainingContext]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]], primary_objective: Optional[str] = None) -> TModel:
         pass
+
+    @abstractmethod
+    async def train(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TTrainingContext]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]], primary_objective: Optional[str] = None) -> TModel:
+        pass

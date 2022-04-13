@@ -6,9 +6,8 @@ from experimentation.experiment.abstractions.experimentation_service import Expe
 from ...evaluation.abstractions.evaluation_context import TModel
 from ...modeling.abstractions.model import Model, TInput, TTarget
 
-
-class DatasetFactoryFactory(Generic[TInput, TTarget, TExperimentSettings], ABC):
+class DatasetFactory(Generic[TInput, TTarget, TExperimentSettings], ABC):
 
     @abstractmethod
-    def create(self, settings: TExperimentSettings) -> Dataset[Tuple[TInput, TTarget]]:
+    def create(self, settings: TExperimentSettings) -> Dict[str, Dataset[Tuple[TInput, TTarget]]]:
         pass

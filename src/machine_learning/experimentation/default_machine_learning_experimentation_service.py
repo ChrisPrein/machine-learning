@@ -80,17 +80,17 @@ class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TMod
         model: TModel = self.__model_factory.create(experiment_settings)
         
         training_service: TrainingService[TInput, TTarget, TModel, TrainingContext[TModel], EvaluationContext[TInput, TTarget, TModel]] = self.__training_service_factory.create(experiment_settings)
-        training_dataset: Dataset[Tuple[TInput, TTarget]] = self.__training_dataset_factory.create(experiment_settings)
+        training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory.create(experiment_settings)
         stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]] = self.__stop_condition_factory.create(experiment_settings)
         objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]] = self.__objective_function_factory.create(experiment_settings)
 
-        model = await training_service.train(model=model, dataset=training_dataset, stop_conditions=stop_conditions, objective_functions=objective_functions)
+        model = await training_service.train(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
 
         evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]] = self.__evaluation_service_factory.create(experiment_settings)
-        evaluation_dataset: Dataset[Tuple[TInput, TTarget]] = self.__test_dataset_factory.create(experiment_settings)
+        evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory.create(experiment_settings)
         evaluation_metrics: Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]] = self.__evaluation_metric_factory.create(experiment_settings)
         
-        scores: Dict[str, float] = await evaluation_service.evaluate(model=model, evaluation_dataset=evaluation_dataset, evaluation_metrics=evaluation_metrics)
+        scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
 
         return DefaultMachineLearningExperimentResult[TModel](model, scores)
 
