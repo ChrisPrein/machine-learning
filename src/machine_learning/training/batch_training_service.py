@@ -65,7 +65,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
         self.__logger.info("Finished checking stop conditions.")
         return is_any_satisfied
 
-    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: str) -> TModel:
+    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
         if model is None:
             raise ValueError("model")
 
@@ -77,6 +77,9 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
 
         if objective_functions is None:
             raise ValueError("objective_functions can't be empty")
+
+        if primary_objective is None:
+            primary_objective = objective_functions.keys()[0]
 
         batch_size: int = len(dataset) if self.__batch_size is None else self.__batch_size
         training_context: DefaultTrainingContext[TModel] = DefaultTrainingContext[TModel](model=model, objectives=objective_functions.keys(), primary_objective=primary_objective)

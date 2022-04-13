@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, List, Generic, Dict, Tuple
+from typing import Optional, TypeVar, List, Generic, Dict, Tuple
 from dataset_handling.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 
@@ -12,5 +12,5 @@ from .training_context import TModel
 class TrainingService(Generic[TInput, TTarget, TModel, TTrainingContext, TEvaluationContext], ABC):
     
     @abstractmethod
-    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TTrainingContext]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]], primary_objective: str) -> TModel:
+    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TTrainingContext]], objective_functions: Dict[str, ObjectiveFunction[TEvaluationContext]], primary_objective: Optional[str] = None) -> TModel:
         pass
