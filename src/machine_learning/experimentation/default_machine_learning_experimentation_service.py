@@ -22,21 +22,23 @@ from .default_machine_learning_experiment_result import DefaultMachineLearningEx
 from .abstractions.evaluation_service_factory import EvaluationServiceFactory
 from .abstractions.model_factory import ModelFactory
 from .abstractions.training_service_factory import TrainingServiceFactory
-from .abstractions.dataset_factory import DatasetFactory
-from .machine_learning_experiment_settings import MachineLearningExperimentSettings
+from .abstractions.dataset_factory import DatasetFactory, TDatasetSettings
+from .machine_learning_experiment_settings import MachineLearningExperimentSettings, TTrainingServiceSettings, TStopConditionSettings, TObjectiveFunctionSettings, TModelSettings, TEvaluationServiceSettings, TEvaluationMetricSettings, TTrainingDatasetSettings, TEvaluationDatasetSettings
 
 nest_asyncio.apply()
 
-class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TModel], ExperimentationService[MachineLearningExperimentSettings, DefaultMachineLearningExperimentResult[TModel]]):
+class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TModel, TTrainingServiceSettings, TStopConditionSettings, TObjectiveFunctionSettings, 
+TModelSettings, TEvaluationServiceSettings, TEvaluationMetricSettings, TTrainingDatasetSettings, TEvaluationDatasetSettings], 
+ExperimentationService[MachineLearningExperimentSettings, DefaultMachineLearningExperimentResult[TModel]]):
     def __init__(self, logger: Logger,
-    model_factory: ModelFactory[TModel], 
-    training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel], 
-    evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel], 
-    training_dataset_factory: DatasetFactory[TInput, TTarget], 
-    test_dataset_factory: DatasetFactory[TInput, TTarget],
-    evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel],
-    objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel],
-    stop_condition_factory: StopConditionFactory[TModel],
+    model_factory: ModelFactory[TModel, TModelSettings], 
+    training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel, TTrainingServiceSettings], 
+    evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel, TEvaluationServiceSettings], 
+    training_dataset_factory: DatasetFactory[TInput, TTarget, TTrainingDatasetSettings], 
+    test_dataset_factory: DatasetFactory[TInput, TTarget, TEvaluationDatasetSettings],
+    evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel, TEvaluationMetricSettings],
+    objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel, TObjectiveFunctionSettings],
+    stop_condition_factory: StopConditionFactory[TModel, TStopConditionSettings],
     event_loop: Optional[asyncio.AbstractEventLoop] = None):
 
         if logger is None:
@@ -68,14 +70,14 @@ class DefaultMachineLearningExperimentationService(Generic[TInput, TTarget, TMod
 
         self.__logger: Logger = Logger
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
-        self.__model_factory: ModelFactory[TModel] = model_factory
-        self.__training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel] = training_service_factory
-        self.__evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel] = evaluation_service_factory
-        self.__training_dataset_factory: DatasetFactory[TInput, TTarget] = training_dataset_factory
-        self.__test_dataset_factory: DatasetFactory[TInput, TTarget] = test_dataset_factory
-        self.__evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel] = test_dataset_factory
-        self.__objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel] = test_dataset_factory
-        self.__stop_condition_factory: StopConditionFactory[TModel] = test_dataset_factory
+        self.__model_factory: ModelFactory[TModel, TModelSettings] = model_factory
+        self.__training_service_factory: TrainingServiceFactory[TInput, TTarget, TModel, TTrainingServiceSettings] = training_service_factory
+        self.__evaluation_service_factory: EvaluationServiceFactory[TInput, TTarget, TModel, TEvaluationServiceSettings] = evaluation_service_factory
+        self.__training_dataset_factory: DatasetFactory[TInput, TTarget, TTrainingDatasetSettings] = training_dataset_factory
+        self.__test_dataset_factory: DatasetFactory[TInput, TTarget, TEvaluationDatasetSettings] = test_dataset_factory
+        self.__evaluation_metric_factory: EvaluationMetricFactory[TInput, TTarget, TModel, TEvaluationMetricSettings] = test_dataset_factory
+        self.__objective_function_factory: ObjectiveFunctionFactory[TInput, TTarget, TModel, TObjectiveFunctionSettings] = test_dataset_factory
+        self.__stop_condition_factory: StopConditionFactory[TModel, TStopConditionSettings] = test_dataset_factory
 
     async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings) -> DefaultMachineLearningExperimentResult[TModel]:
         model: TModel = self.__model_factory.create(experiment_settings)

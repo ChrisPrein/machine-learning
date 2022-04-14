@@ -6,10 +6,10 @@ from ...evaluation.abstractions.evaluation_context import TModel, EvaluationCont
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from ...evaluation.abstractions.evaluation_service import EvaluationService
 from ...evaluation.abstractions.evaluation_metric import EvaluationMetric
-from ..machine_learning_experiment_settings import MachineLearningExperimentSettings
+from ..machine_learning_experiment_settings import MachineLearningExperimentSettings, TEvaluationMetricSettings
 
-class EvaluationMetricFactory(Generic[TInput, TTarget, TModel], ABC):
+class EvaluationMetricFactory(Generic[TInput, TTarget, TModel, TEvaluationMetricSettings], ABC):
 
     @abstractmethod
-    def create(self, settings: MachineLearningExperimentSettings) -> Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]]:
+    def create(self, settings: TEvaluationMetricSettings) -> Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]]:
         pass

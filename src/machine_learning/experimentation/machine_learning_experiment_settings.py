@@ -1,14 +1,24 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Generic, TypeVar
 from experimentation.experiment.abstractions.experiment_settings import ExperimentSettings
 
+TModelSettings = TypeVar("TModelSettings")
+TTrainingServiceSettings = TypeVar("TTrainingServiceSettings")
+TEvaluationServiceSettings = TypeVar("TEvaluationServiceSettings")
+TEvaluationDatasetSettings = TypeVar("TEvaluationDatasetSettings")
+TTrainingDatasetSettings = TypeVar("TTrainingDatasetSettings")
+TEvaluationMetricSettings = TypeVar("TEvaluationMetricSettings")
+TObjectiveFunctionSettings = TypeVar("TObjectiveFunctionSettings")
+TStopConditionSettings = TypeVar("TStopConditionSettings")
+
 @dataclass    
-class MachineLearningExperimentSettings(ExperimentSettings):    
-    model_settings: Dict[str, Any]
-    training_service_settings: Dict[str, Any]
-    evaluation_service_settings: Dict[str, Any]
-    evaluation_dataset_settings: Dict[str, Any]
-    training_dataset_settings: Dict[str, Any]
-    evaluation_metric_settings: Dict[str, Any]
-    objective_function_settings: Dict[str, Any]
-    stop_condition_settings: Dict[str, Any]
+class MachineLearningExperimentSettings(Generic[TModelSettings, TTrainingServiceSettings, TEvaluationServiceSettings, TEvaluationDatasetSettings, TTrainingDatasetSettings, 
+TEvaluationMetricSettings, TObjectiveFunctionSettings, TStopConditionSettings], ExperimentSettings):    
+    model_settings: TModelSettings
+    training_service_settings: TTrainingServiceSettings
+    evaluation_service_settings: TEvaluationServiceSettings
+    evaluation_dataset_settings: TEvaluationDatasetSettings
+    training_dataset_settings: TTrainingDatasetSettings
+    evaluation_metric_settings: TEvaluationMetricSettings
+    objective_function_settings: TObjectiveFunctionSettings
+    stop_condition_settings: TStopConditionSettings
