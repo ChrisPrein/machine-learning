@@ -12,7 +12,7 @@ TObjectiveFunctionSettings = TypeVar("TObjectiveFunctionSettings")
 TStopConditionSettings = TypeVar("TStopConditionSettings")
 
 @dataclass    
-class MachineLearningExperimentSettings(Generic[TModelSettings, TTrainingServiceSettings, TEvaluationServiceSettings, TEvaluationDatasetSettings, TTrainingDatasetSettings, 
+class DefaultMachineLearningExperimentSettings(Generic[TModelSettings, TTrainingServiceSettings, TEvaluationServiceSettings, TEvaluationDatasetSettings, TTrainingDatasetSettings, 
 TEvaluationMetricSettings, TObjectiveFunctionSettings, TStopConditionSettings], ExperimentSettings):    
     model_settings: TModelSettings
     training_service_settings: TTrainingServiceSettings
