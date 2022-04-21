@@ -3,6 +3,6 @@ from typing import Any, Dict
 
 
 @dataclass
-class DefaultSignleInstanceSettings:
+class DefaultInstanceSettings:
     name: str
     params: Dict[str, Any]

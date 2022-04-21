@@ -6,7 +6,7 @@ from ...parameter_tuning.abstractions.objective_function import OptimizationType
 
 TModel = TypeVar('TModel', bound=Model)
 
-@dataclass
+@dataclass(frozen=True)
 class Score:
     epoch: int
     iteration: int

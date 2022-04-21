@@ -1,11 +1,23 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic
-from .evaluation_context import EvaluationContext, TModel
+from dataclasses import dataclass
+from ...modeling.abstractions.model import Model, TInput, TTarget
 
-TEvaluationContext = TypeVar('TEvaluationContext', bound=EvaluationContext)
+TModel = TypeVar('TModel', bound=Model)
 
-class EvaluationMetric(Generic[TEvaluationContext], ABC):
+@dataclass(frozen=True)
+class Prediction(Generic[TInput, TTarget]):
+    input: TInput
+    prediction: TTarget
+    target: TTarget
+
+@dataclass(frozen=True)
+class EvaluationContext(Generic[TInput, TTarget, TModel], ABC):
+    model: TModel
+    predictions: List[Prediction[TInput, TTarget]]
+
+class EvaluationMetric(Generic[TInput, TTarget, TModel], ABC):
     
     @abstractmethod
-    def calculate_score(self, context: TEvaluationContext) -> float:
+    def calculate_score(self, context: EvaluationContext[TInput, TTarget, TModel]) -> float:
         pass

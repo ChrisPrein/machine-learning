@@ -10,10 +10,8 @@ from unittest.mock import patch
 from numpy import number
 from sklearn import datasets
 from ..modeling.abstractions.model import Model, TInput, TTarget
-from .abstractions.evaluation_metric import EvaluationMetric
+from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, TModel
 from .abstractions.evaluation_service import EvaluationService
-from .abstractions.evaluation_context import EvaluationContext, TModel
-from .default_evaluation_context import DefaultEvaluationContext
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -24,14 +22,14 @@ from multidispatch import multimethod, multifunction
 import nest_asyncio
 nest_asyncio.apply()
 
-class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]], ABC):
+class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     def __init__(self, batch_size: Optional[int], drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: Optional[int] = batch_size
         self.__drop_last: bool = drop_last
 
     @multimethod(Model, Dataset, dict)
-    async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]]) -> Dict[str, float]:
+    async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
 
@@ -43,7 +41,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Eval
 
         batch_size: int = len(evaluation_dataset) if self.__batch_size is None else self.__batch_size
 
-        evaluation_context: DefaultEvaluationContext[TInput, TTarget, TModel] = DefaultEvaluationContext[TInput, TTarget, TModel](model)
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, [])
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=evaluation_dataset, batch_size=batch_size, drop_last=self.__drop_last)
 
         prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: model.predict_batch(input_batch=[sample[0] for sample in batch])) for batch in data_loader]
@@ -59,13 +57,13 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel, Eval
 
         return result
 
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]]) -> Tuple[str, Dict[str, float]]:
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Tuple[str, Dict[str, float]]:
         result = await self.evaluate(evaluation_dataset[1])
 
         return (evaluation_dataset[0], result)
 
     @evaluate.dispatch(Model, dict, dict)
-    async def evaluate(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]]) -> Dict[str, Dict[str, float]]:
+    async def evaluate(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, float]]:
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, float]]]] = [self.__evaluate(model, dataset, evaluation_metrics) for dataset in evaluation_datasets.items()]
 
         completed, pending = await asyncio.wait(experiment_tasks)
