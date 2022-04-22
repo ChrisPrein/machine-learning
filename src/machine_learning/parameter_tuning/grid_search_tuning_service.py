@@ -5,27 +5,25 @@ from sklearn.model_selection import GridSearchCV
 from torch.utils.data.dataset import Dataset
 from sklearn import metrics
 
-from ..evaluation.default_evaluation_context import DefaultEvaluationContext
 from ..modeling.adapter.sklearn_estimator_adapter import SkleanEstimatorAdapter
 from .abstractions.model_factory import ModelFactory
 from .abstractions.objective_function import ObjectiveFunction, OptimizationType
 from ..modeling.abstractions.model import TInput, TTarget, Model
-from ..evaluation.abstractions.evaluation_context import Prediction, TModel
-from ..evaluation.abstractions.evaluation_metric import TEvaluationContext
+from ..evaluation.abstractions.evaluation_metric import Prediction, TModel, EvaluationContext
 from .abstractions.parameter_tuning_service import ParameterTuningService
 
-def score_function(estimator: SkleanEstimatorAdapter[Model[TInput, TTarget]], y_target: ndarray, y_predicted: ndarray, objective_function: ObjectiveFunction[DefaultEvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]) -> float:
+def score_function(estimator: SkleanEstimatorAdapter[Model[TInput, TTarget]], y_target: ndarray, y_predicted: ndarray, objective_function: ObjectiveFunction[TInput, TTarget, Model[TInput, TTarget]]) -> float:
     
     predictions: List[Prediction] = [Prediction(input=None, prediction=predicted, target=target) for target, predicted in zip(y_target, y_predicted)]
-    context: DefaultEvaluationContext[TInput, TTarget, Model[TInput, TTarget]] = DefaultEvaluationContext[TInput, TTarget, Model[TInput, TTarget]](model=None, predictions=predictions)
+    context: EvaluationContext[TInput, TTarget, Model[TInput, TTarget]] = EvaluationContext[TInput, TTarget, Model[TInput, TTarget]](model=None, predictions=predictions)
 
     return objective_function.calculate_score(context=context)
 
-class GridSearchTuningService(ParameterTuningService[TInput, TTarget, Model[TInput, TTarget], DefaultEvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]):
+class GridSearchTuningService(ParameterTuningService[TInput, TTarget, Model[TInput, TTarget], EvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]):
     def __init__(self, folds: int = 5):
         self.__folds: int = folds
 
-    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[DefaultEvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]], primary_objective: str) -> Dict[str, Any]:
+    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]], primary_objective: str) -> Dict[str, Any]:
         if model_factory is None:
             raise ValueError("model_factory can't be empty")
 

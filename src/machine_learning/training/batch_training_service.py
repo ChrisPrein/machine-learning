@@ -1,13 +1,6 @@
-from abc import ABC, abstractmethod
-from argparse import ArgumentError
-from dataclasses import dataclass
-import enum
-import inspect
+from abc import ABC
 from logging import Logger
 from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
-from datetime import timedelta, datetime
-from unittest.mock import patch
-from numpy import number
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -17,19 +10,16 @@ from multidispatch import multimethod, multifunction
 import nest_asyncio
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
-from ..evaluation.abstractions.evaluation_context import EvaluationContext
-from ..evaluation.default_evaluation_context import DefaultEvaluationContext
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
-from .default_training_context import DefaultTrainingContext
-from .abstractions.stop_condition import StopCondition
-from .abstractions.training_context import Score, TModel, TrainingContext
+from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
+from ..evaluation.abstractions.evaluation_metric import EvaluationContext, TModel
 
 nest_asyncio.apply()
 
-class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingContext[TModel], EvaluationContext[TInput, TTarget, TModel]], ABC):
-    def __init__(self, logger: Logger, evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]], batch_size: Optional[int], drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8):
+class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
+    def __init__(self, logger: Logger, evaluation_service: EvaluationService[TInput, TTarget, TModel], batch_size: Optional[int], drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8):
         if logger is None:
             raise ValueError("logger")
 
@@ -45,7 +35,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
         self.__evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]] = evaluation_service
         self.__training_dataset_size_ratio: float = training_dataset_size_ratio
 
-    def is_any_stop_condition_satisfied(self, training_context: DefaultTrainingContext[TModel], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]]) -> bool:
+    def is_any_stop_condition_satisfied(self, training_context: TrainingContext[TModel], stop_conditions: Dict[str, StopCondition[TModel]]) -> bool:
         self.__logger.info("Checking stop conditions.")
         is_any_satisfied: bool = False
 
@@ -66,7 +56,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
         return is_any_satisfied
 
     @multimethod(Model, Dataset, dict, dict, str)
-    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
+    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None) -> TModel:
         if model is None:
             raise ValueError("model")
 
@@ -83,7 +73,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
             primary_objective = objective_functions.keys()[0]
 
         batch_size: int = len(dataset) if self.__batch_size is None else self.__batch_size
-        training_context: DefaultTrainingContext[TModel] = DefaultTrainingContext[TModel](model=model, objectives=objective_functions.keys(), primary_objective=primary_objective)
+        training_context: TrainingContext[TModel] = TrainingContext[TModel](model=model, scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, scores=[], current_epoch=0, current_iteration=0)
         training_size: int = len(dataset) * self.__training_dataset_size_ratio
         validation_size: int = 1 - training_size
         training_dataset, validation_dataset = random_split(dataset=dataset, lengths=(training_size, validation_size))
@@ -110,13 +100,13 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel, TrainingCont
 
         return model
 
-    async def __train(self, model: TModel, dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
+    async def __train(self, model: TModel, dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None) -> TModel:
         result = await self.train(model, dataset[1], stop_conditions, objective_functions, primary_objective)
 
         return result
 
     @train.dispatch(Model, dict, dict, dict, str)
-    async def train(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TrainingContext[TModel]]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, TModel]]], primary_objective: Optional[str] = None) -> TModel:
+    async def train(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None) -> TModel:
         for dataset in datasets:
             model = await self.__train(model, dataset, stop_conditions, objective_functions, primary_objective)
 

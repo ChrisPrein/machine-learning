@@ -3,6 +3,7 @@ from argparse import ArgumentError
 from dataclasses import dataclass
 import enum
 import inspect
+from itertools import Predicate
 from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
 from datetime import timedelta, datetime
 from unittest.mock import patch
@@ -10,7 +11,7 @@ from unittest.mock import patch
 from numpy import number
 from sklearn import datasets
 from ..modeling.abstractions.model import Model, TInput, TTarget
-from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, TModel
+from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService
 import asyncio
 import asyncio.tasks
@@ -28,6 +29,16 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         self.__batch_size: Optional[int] = batch_size
         self.__drop_last: bool = drop_last
 
+    def __predict_batch(self, model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
+        inputs: List[TInput] = [sample[0] for sample in batch]
+        targets: List[TInput] = [sample[1] for sample in batch]
+        predictions: List[TTarget] = model.predict_batch(input_batch=inputs)
+
+        combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
+
+        return [Prediction(result[0], result[1], result[2]) for result in combined]
+
+
     @multimethod(Model, Dataset, dict)
     async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, float]:
         if model is None:
@@ -44,7 +55,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, [])
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=evaluation_dataset, batch_size=batch_size, drop_last=self.__drop_last)
 
-        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: model.predict_batch(input_batch=[sample[0] for sample in batch])) for batch in data_loader]
+        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: self.__predict_batch(model, batch)) for batch in data_loader]
         completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
 
         for t in completed:

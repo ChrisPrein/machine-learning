@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeVar, List, Generic, Dict
 
-from .training_context import TrainingContext
 from ...modeling.abstractions.model import Model
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from ...parameter_tuning.abstractions.objective_function import OptimizationType
@@ -16,39 +15,24 @@ class Score:
     score: float
     optimization_type: OptimizationType
 
-
+@dataclass
 class TrainingContext(Generic[TModel]):
-    
-    @property
-    @abstractmethod
-    def model(self) -> TModel:
-        pass
-
-    @property
-    @abstractmethod
-    def current_epoch(self) -> int:
-        pass
-
-    @property
-    @abstractmethod
-    def current_iteration(self) -> int:
-        pass
+    model: TModel
+    current_epoch: int
+    current_iteration: int
+    scores: Dict[str, List[Score]]
+    _primary_objective: str
 
     @property
     @abstractmethod
     def primary_scores(self) -> List[Score]:
-        pass
+        return self.scores[self._primary_objective]
 
-    @property
-    @abstractmethod
-    def scores(self) -> List[Dict[str, Score]]:
-        pass
-
-class StopCondition(Generic[TTrainingContext], ABC):
+class StopCondition(Generic[TModel], ABC):
     @abstractmethod
     def reset(self):
         pass
 
     @abstractmethod
-    def is_satisfied(self, context: TTrainingContext) -> bool:
+    def is_satisfied(self, context: TrainingContext[TModel]) -> bool:
         pass

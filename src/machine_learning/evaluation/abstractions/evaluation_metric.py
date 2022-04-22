@@ -21,3 +21,6 @@ class EvaluationMetric(Generic[TInput, TTarget, TModel], ABC):
     @abstractmethod
     def calculate_score(self, context: EvaluationContext[TInput, TTarget, TModel]) -> float:
         pass
+
+    def __call__(self, context: EvaluationContext[TInput, TTarget, TModel]) -> float:
+        return self.calculate_score(context)

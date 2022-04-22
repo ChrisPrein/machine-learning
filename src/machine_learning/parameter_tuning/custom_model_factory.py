@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict
 from .abstractions.model_factory import ModelFactory
-from ..evaluation.default_evaluation_context import TModel
+from ..evaluation.abstractions.evaluation_metric import TModel
 
 class CustomModelFactory(ModelFactory[TModel]):
     def __init__(self, expression: Callable[[Dict[str, Any]], TModel]):
