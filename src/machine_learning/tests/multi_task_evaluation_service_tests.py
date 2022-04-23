@@ -24,8 +24,6 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.model.predict_batch = Mock(return_value=[fake.last_name() for i in range(10)])
 
-        test = isinstance(self.model, Model)
-
         self.evaluation_metric_1: EvaluationMetric[str, str, Model[str, str]] = MagicMock(spec=EvaluationMetric)
 
         self.evaluation_metric_1.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
