@@ -4,8 +4,8 @@ from .abstractions.instance_factory import InstanceFactory, TInstance
 from .default_instance_settings import DefaultInstanceSettings
 from .default_instance_factory import DefaultInstanceFactory
 
-class DefaultNamedSingleInstanceFactory(Generic[TInstance], InstanceFactory[Dict[str, DefaultInstanceSettings], Dict[str, TInstance]]):
-    def __init__(self, available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, DefaultInstanceSettings]], TInstance]]]):
+class DefaultDictInstanceFactory(Generic[TInstance], InstanceFactory[Dict[str, DefaultInstanceSettings], Dict[str, TInstance]]):
+    def __init__(self, available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]]]):
         if available_types is None:
             raise ValueError("available_types")
 

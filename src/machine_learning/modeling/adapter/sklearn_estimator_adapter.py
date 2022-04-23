@@ -1,4 +1,4 @@
-from machine_learning.evaluation.abstractions.evaluation_context import TModel
+from ...evaluation.abstractions.evaluation_metric import TModel
 from ..abstractions.model import Model, TInput, TTarget
 from sklearn.base import BaseEstimator
 from typing import Dict, Any, TypeVar, Generic

@@ -45,20 +45,10 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_evaluate_valid_model_metrics_and_dataset_should_return_results_for_each_metric(self):
+    def test_evaluate_valid_model_metrics_and_dataloader_should_return_results_for_each_metric(self):
         evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = self.evaluation_service.evaluate(self.model, self.dataset, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
-
-        assert len(result.items()) == 2
-
-    def test_evaluation_on_multiple_datasets_valid_model_metrics_and_datasets_should_return_results_for_each_metric_on_each_dataset(self):
-        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
-
-        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = self.evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
-            {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
-
-        result: Dict[str, Dict[str, float]] = self.event_loop.run_until_complete(evaluation_routine)
 
         assert len(result.items()) == 2

@@ -6,7 +6,7 @@ from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
 
-from ..evaluation.abstractions.evaluation_context import EvaluationContext
+from ..evaluation.abstractions.evaluation_metric import EvaluationContext
 from ..parameter_tuning.abstractions.model_factory import ModelFactory
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from ..parameter_tuning.grid_search_tuning_service import GridSearchTuningService
@@ -48,7 +48,7 @@ class GridSearchTuningServiceTestCase(unittest.TestCase):
 
         self.objective_function_patcher = patch('machine_learning.parameter_tuning.abstractions.objective_function.ObjectiveFunction')
 
-        self.objective_function: ObjectiveFunction[EvaluationContext[float, float, Model[float, float]]] = self.objective_function_patcher.start()
+        self.objective_function: ObjectiveFunction[float, float, Model[float, float]] = self.objective_function_patcher.start()
 
         self.objective_function.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
 

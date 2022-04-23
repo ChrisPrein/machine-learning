@@ -1,19 +1,8 @@
-from asyncio import coroutine
-import asyncio
-from dataclasses import dataclass
-from re import S
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
-from torch.utils.data import Dataset
-from dataset_handling.dataloader import DataLoader
-from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
-import random
 
 from ..parameter_tuning.custom_model_factory import CustomModelFactory
-from ..parameter_tuning.custom_objective_function import CustomObjectiveFunction
-from ..evaluation.custom_evaluation_metric import CustomEvaluationMetric
-from ..evaluation.abstractions.evaluation_context import EvaluationContext, Prediction, TTarget, TModel, TInput
 from ..modeling.abstractions.model import Model
 
 class CustomModelFactoryTestCase(unittest.TestCase):

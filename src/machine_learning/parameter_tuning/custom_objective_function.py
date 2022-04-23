@@ -6,11 +6,11 @@ from ..evaluation.abstractions.evaluation_metric import EvaluationMetric, TModel
 
 
 class CustomObjectiveFunction(ObjectiveFunction[TInput, TTarget, TModel]):
-    def __init__(self, expression: Union[Callable[[EvaluationContext[TInput, TTarget, TModel]], float], EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]], optimization_type: Optional[OptimizationType] = OptimizationType.MAX):
+    def __init__(self, expression: Union[Callable[[EvaluationContext[TInput, TTarget, TModel]], float], EvaluationMetric[TInput, TTarget, TModel]], optimization_type: Optional[OptimizationType] = OptimizationType.MAX):
         if expression is None:
             raise ValueError("expression can't be empty")
 
-        self.expression: Union[Callable[[EvaluationContext[TInput, TTarget, TModel]], float], EvaluationMetric[EvaluationContext[TInput, TTarget, TModel]]] = expression
+        self.expression: Union[Callable[[EvaluationContext[TInput, TTarget, TModel]], float], EvaluationMetric[TInput, TTarget, TModel]] = expression
 
         self.__optimization_type: OptimizationType = optimization_type
 

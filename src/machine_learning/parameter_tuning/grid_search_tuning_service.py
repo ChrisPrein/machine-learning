@@ -19,11 +19,11 @@ def score_function(estimator: SkleanEstimatorAdapter[Model[TInput, TTarget]], y_
 
     return objective_function.calculate_score(context=context)
 
-class GridSearchTuningService(ParameterTuningService[TInput, TTarget, Model[TInput, TTarget], EvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]):
+class GridSearchTuningService(ParameterTuningService[TInput, TTarget, Model[TInput, TTarget]]):
     def __init__(self, folds: int = 5):
         self.__folds: int = folds
 
-    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[EvaluationContext[TInput, TTarget, Model[TInput, TTarget]]]], primary_objective: str) -> Dict[str, Any]:
+    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, Model[TInput, TTarget]]], primary_objective: str) -> Dict[str, Any]:
         if model_factory is None:
             raise ValueError("model_factory can't be empty")
 

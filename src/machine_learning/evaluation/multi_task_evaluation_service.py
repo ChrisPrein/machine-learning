@@ -1,15 +1,4 @@
-from abc import ABC, abstractmethod
-from argparse import ArgumentError
-from dataclasses import dataclass
-import enum
-import inspect
-from itertools import Predicate
 from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
-from datetime import timedelta, datetime
-from unittest.mock import patch
-
-from numpy import number
-from sklearn import datasets
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService
@@ -18,13 +7,12 @@ import asyncio.tasks
 import asyncio.futures
 from dataset_handling.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
-from multidispatch import multimethod, multifunction
 
 import nest_asyncio
 nest_asyncio.apply()
 
 class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, batch_size: Optional[int], drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: Optional[int] = batch_size
         self.__drop_last: bool = drop_last
@@ -38,8 +26,6 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         return [Prediction(result[0], result[1], result[2]) for result in combined]
 
-
-    @multimethod(Model, Dataset, dict)
     async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
@@ -69,12 +55,11 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         return result
 
     async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Tuple[str, Dict[str, float]]:
-        result = await self.evaluate(evaluation_dataset[1])
+        result = await self.evaluate(model, evaluation_dataset[1], evaluation_metrics)
 
         return (evaluation_dataset[0], result)
 
-    @evaluate.dispatch(Model, dict, dict)
-    async def evaluate(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, float]]:
+    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, float]]:
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, float]]]] = [self.__evaluate(model, dataset, evaluation_metrics) for dataset in evaluation_datasets.items()]
 
         completed, pending = await asyncio.wait(experiment_tasks)

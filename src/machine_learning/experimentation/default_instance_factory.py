@@ -1,14 +1,14 @@
-from typing import Callable, Dict, Generic, Type, Union
+from typing import Any, Callable, Dict, Generic, Type, Union
 
 from .abstractions.instance_factory import InstanceFactory, TInstance
 from .default_instance_settings import DefaultInstanceSettings
 
 class DefaultInstanceFactory(Generic[TInstance], InstanceFactory[DefaultInstanceSettings, TInstance]):
-    def __init__(self, available_types: Dict[str, Union[Type[TInstance], Callable[[DefaultInstanceSettings], TInstance]]]):
+    def __init__(self, available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]]]):
         if available_types is None:
             raise ValueError("available_types")
 
-        self.__available_types: Dict[str, Union[Type[TInstance], Callable[[DefaultInstanceSettings], TInstance]]] = available_types
+        self.__available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]]] = available_types
 
     def create(self, settings: DefaultInstanceSettings) -> TInstance:
         if settings is None:
@@ -23,6 +23,6 @@ class DefaultInstanceFactory(Generic[TInstance], InstanceFactory[DefaultInstance
         if not settings.name in self.__available_types:
             raise KeyError(f'No matching type with name {settings.name} found.')
 
-        type: Union[Type[TInstance], Callable[[DefaultInstanceSettings], TInstance]] = self.__available_types[settings.name]
+        type: Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]] = self.__available_types[settings.name]
 
         return type(**settings.params)
