@@ -3,13 +3,13 @@ from typing import Any, Callable, Coroutine, List, Dict, Tuple, Type
 
 from torch import isin
 
-from ..experimentation.default_instance_settings import DefaultInstanceSettings
 from ..modeling.abstractions.model import Model
 from ..experimentation.default_dict_instance_factory import DefaultDictInstanceFactory
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
 from ..evaluation.custom_evaluation_metric import CustomEvaluationMetric
+from ..experimentation.abstractions.machine_learning_experimentation_service import InstanceSettings
 
 CustomEvaluationMetricAlias = CustomEvaluationMetric[float, float, Model[float, float]]
 
@@ -25,7 +25,7 @@ class DefaultDictInstanceFactoryTestCase(unittest.TestCase):
 
         default_instance_factory: DefaultDictInstanceFactory[EvaluationMetric[float, float, Model[float, float]]] = DefaultDictInstanceFactory[EvaluationMetric[float, float, Model[float, float]]](available_types=available_types)
 
-        default_instance_settings: Dict[str, DefaultInstanceSettings] = {'metric_1': DefaultInstanceSettings(name="metric_1", params={}), 'metric_2': DefaultInstanceSettings(name="metric_2", params={})}
+        default_instance_settings: Dict[str, InstanceSettings] = {'metric_1': InstanceSettings(name="metric_1", params={}), 'metric_2': InstanceSettings(name="metric_2", params={})}
 
         instances: Dict[str, EvaluationMetric[float, float, Model[float, float]]] = default_instance_factory.create(default_instance_settings)
 

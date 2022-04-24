@@ -1,16 +1,16 @@
 from typing import Any, Callable, Dict, Generic, Type, Union
 
 from .abstractions.instance_factory import InstanceFactory, TInstance
-from .default_instance_settings import DefaultInstanceSettings
+from .abstractions.machine_learning_experimentation_service import InstanceSettings
 
-class DefaultInstanceFactory(Generic[TInstance], InstanceFactory[DefaultInstanceSettings, TInstance]):
+class DefaultInstanceFactory(Generic[TInstance], InstanceFactory[InstanceSettings, TInstance]):
     def __init__(self, available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]]]):
         if available_types is None:
             raise ValueError("available_types")
 
         self.__available_types: Dict[str, Union[Type[TInstance], Callable[[Dict[str, Any]], TInstance]]] = available_types
 
-    def create(self, settings: DefaultInstanceSettings) -> TInstance:
+    def create(self, settings: InstanceSettings) -> TInstance:
         if settings is None:
             raise ValueError("settings")
 

@@ -2,9 +2,9 @@ from ast import Call
 import asyncio
 import itertools
 from logging import Logger
+import logging
 from tokenize import Single
 from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union
-from experimentation.experiment.abstractions.experimentation_service import ExperimentationService, TExperimentSettings, TExperimentResult
 from matplotlib.pyplot import eventplot
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
@@ -17,23 +17,24 @@ from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from ..modeling.abstractions.model import TInput, TTarget
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..training.abstractions.training_service import TrainingService
-from .abstractions.machine_learning_experimentation_service import MachineLearningExperimentationService, MachineLearningExperimentSettings, MachineLearningExperimentResult, MachineLearningRunResult, MachineLearningRunSettings
-from .default_instance_settings import DefaultInstanceSettings
+from .abstractions.machine_learning_experimentation_service import MachineLearningExperimentationService, MachineLearningExperimentSettings, MachineLearningExperimentResult, MachineLearningRunResult, MachineLearningRunSettings, InstanceSettings
+from .default_instance_factory import DefaultInstanceFactory
+from .default_dict_instance_factory import DefaultDictInstanceFactory
 
 nest_asyncio.apply()
 
-TSettings = TypeVar('TSettings')
+TSettings = TypeVar('TSettings', InstanceSettings, Dict[str, InstanceSettings])
 TInstance = TypeVar('TInstance')
 
 FactoryAlias = Union[InstanceFactory[TSettings, TInstance], Callable[[TSettings], TInstance]]
-ModelFactoryAlias = FactoryAlias[DefaultInstanceSettings, TModel]
-TrainingServiceFactoryAlias = FactoryAlias[DefaultInstanceSettings, TrainingService[TInput, TTarget, TModel]]
-EvaluationServiceFactoryAlias = FactoryAlias[DefaultInstanceSettings, EvaluationService[TInput, TTarget, TModel]]
-TrainingDatasetFactoryAlias = FactoryAlias[Dict[str, DefaultInstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
-EvaluationDatasetFactoryAlias = FactoryAlias[Dict[str, DefaultInstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
-EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, DefaultInstanceSettings], Dict[str, EvaluationMetric[TInput, TTarget, TModel]]]
-ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, DefaultInstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]]
-StopConditionFactoryAlias = FactoryAlias[Dict[str, DefaultInstanceSettings], Dict[str, StopCondition[TModel]]]
+ModelFactoryAlias = FactoryAlias[InstanceSettings, TModel]
+TrainingServiceFactoryAlias = FactoryAlias[InstanceSettings, TrainingService[TInput, TTarget, TModel]]
+EvaluationServiceFactoryAlias = FactoryAlias[InstanceSettings, EvaluationService[TInput, TTarget, TModel]]
+TrainingDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
+EvaluationDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
+EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, EvaluationMetric[TInput, TTarget, TModel]]]
+ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]]
+StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TModel]]]
 
 class DefaultMachineLearningExperimentationService(MachineLearningExperimentationService[TModel]):
     def __init__(self, logger: Logger,
@@ -48,7 +49,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     event_loop: Optional[asyncio.AbstractEventLoop] = None):
 
         if logger is None:
-            raise ValueError("logger")
+            logger = logging.getLogger()
 
         if model_factory is None:
             raise ValueError("model_factory")
@@ -74,7 +75,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         if stop_condition_factory is None:
             raise ValueError("stop_condition_factory")
 
-        self.__logger: Logger = Logger
+        self.__logger: Logger = logger
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__model_factory: ModelFactoryAlias[TModel] = model_factory
         self.__training_service_factory: TrainingServiceFactoryAlias[TInput, TTarget, TModel] = training_service_factory
@@ -93,13 +94,13 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
         objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
-        model = await training_service.train(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
+        model = await training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
 
         evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
         evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
         evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
         
-        scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
+        scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
 
         return MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
 

@@ -9,31 +9,36 @@ from ...modeling.abstractions.model import TInput, TTarget
 from ...evaluation.abstractions.evaluation_metric import TModel, EvaluationContext
 
 @dataclass
+class InstanceSettings:
+    name: str
+    params: Dict[str, Any]
+
+@dataclass
 class MachineLearningExperimentResult(Generic[TModel], ExperimentResult):
     model: TModel
     scores: Dict[str, float]
 
 @dataclass    
 class MachineLearningExperimentSettings(ExperimentSettings):    
-    model_settings: List[Dict[str, Any]]
-    training_service_settings: List[Dict[str, Any]]
-    evaluation_service_settings: List[Dict[str, Any]]
-    evaluation_dataset_settings: List[Dict[str, Dict[str, Any]]]
-    training_dataset_settings: List[Dict[str, Dict[str, Any]]]
-    evaluation_metric_settings: List[Dict[str, Dict[str, Any]]]
-    objective_function_settings: List[Dict[str, Dict[str, Any]]]
-    stop_condition_settings: List[Dict[str, Dict[str, Any]]]
+    model_settings: List[InstanceSettings]
+    training_service_settings: List[InstanceSettings]
+    evaluation_service_settings: List[InstanceSettings]
+    evaluation_dataset_settings: List[Dict[str, InstanceSettings]]
+    training_dataset_settings: List[Dict[str, InstanceSettings]]
+    evaluation_metric_settings: List[Dict[str, InstanceSettings]]
+    objective_function_settings: List[Dict[str, InstanceSettings]]
+    stop_condition_settings: List[Dict[str, InstanceSettings]]
 
 @dataclass    
 class MachineLearningRunSettings():    
-    model_settings: Dict[str, Any]
-    training_service_settings: Dict[str, Any]
-    evaluation_service_settings: Dict[str, Any]
-    evaluation_dataset_settings: Dict[str, Dict[str, Any]]
-    training_dataset_settings: Dict[str, Dict[str, Any]]
-    evaluation_metric_settings: Dict[str, Dict[str, Any]]
-    objective_function_settings: Dict[str, Dict[str, Any]]
-    stop_condition_settings: Dict[str, Dict[str, Any]]
+    model_settings: InstanceSettings
+    training_service_settings: InstanceSettings
+    evaluation_service_settings: InstanceSettings
+    evaluation_dataset_settings: Dict[str, InstanceSettings]
+    training_dataset_settings: Dict[str, InstanceSettings]
+    evaluation_metric_settings: Dict[str, InstanceSettings]
+    objective_function_settings: Dict[str, InstanceSettings]
+    stop_condition_settings: Dict[str, InstanceSettings]
 
 @dataclass 
 class MachineLearningRunResult(Generic[TModel]):
