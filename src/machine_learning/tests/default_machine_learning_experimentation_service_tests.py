@@ -28,26 +28,18 @@ class DefaultMachineLearningExperimentationTestCase(unittest.TestCase):
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(100)]
 
         self.model: Model[str, str] = AsyncMock(spec=Model)
-        # self.model.predict_batch = Mock(return_value=[fake.last_name() for i in range(10)])
 
         self.objective_function: ObjectiveFunction[str, str, Model[str, str]] = AsyncMock(spec=ObjectiveFunction)
-        # self.objective_function.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.stop_condition: StopCondition[Model[str, str]] = AsyncMock(spec=StopCondition)
-        # self.stop_condition.is_satisfied = Mock(return_value=False)
 
         self.evaluation_metric: EvaluationMetric[str, str, Model[str, str]] = AsyncMock(spec=EvaluationMetric)
-        # self.evaluation_metric.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.evaluation_service: EvaluationService[str, str, Model[str, str]] = AsyncMock(spec=EvaluationService)
-        # self.evaluation_service.evaluate_on_multiple_datasets = Mock(return_value={'set 1': {'metric 1': 1}})
 
         self.training_service: TrainingService[str, str, Model[str, str]] = AsyncMock(spec=TrainingService)
-        # self.training_service.train_on_multiple_datasets = Mock(return_value=self.model)
 
         self.dataset: Dataset[Tuple[str, str]] = AsyncMock()
-        # self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
-        # self.dataset.__len__ = Mock(return_value=self.samples.__len__())
 
         self.event_loop = asyncio.get_event_loop()
 
