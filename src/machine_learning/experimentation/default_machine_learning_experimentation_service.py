@@ -21,6 +21,13 @@ from .abstractions.machine_learning_experimentation_service import MachineLearni
 from .default_instance_factory import DefaultInstanceFactory
 from .default_dict_instance_factory import DefaultDictInstanceFactory
 
+START_RUN = 60
+END_RUN = 61
+START_EXPERIMENT = 62
+END_EXPERIMENT = 63
+START_EXPERIMENTS = 64
+END_EXPERIMENTS = 65
+
 nest_asyncio.apply()
 
 TSettings = TypeVar('TSettings', InstanceSettings, Dict[str, InstanceSettings])
@@ -37,7 +44,7 @@ ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[s
 StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TModel]]]
 
 class DefaultMachineLearningExperimentationService(MachineLearningExperimentationService[TModel]):
-    def __init__(self, logger: Logger,
+    def __init__(self,
     model_factory: ModelFactoryAlias[TModel], 
     training_service_factory: TrainingServiceFactoryAlias[TInput, TTarget, TModel],
     evaluation_service_factory: EvaluationServiceFactoryAlias[TInput, TTarget, TModel],
@@ -46,7 +53,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget, TModel],
     objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel],
     stop_condition_factory: StopConditionFactoryAlias[TModel],
-    event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    event_loop: Optional[asyncio.AbstractEventLoop] = None,
+    logger: Optional[Logger] = None):
 
         if logger is None:
             logger = logging.getLogger()
@@ -87,6 +95,9 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__stop_condition_factory: StopConditionFactoryAlias[TModel] = stop_condition_factory
 
     async def __execute_run(self, run_settings: MachineLearningRunSettings) -> MachineLearningRunResult[TModel]:
+        self.__logger.info("executing run...")
+        self.__logger.log(START_RUN, run_settings)
+
         model: TModel = self.__model_factory(run_settings.model_settings)
 
         training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
@@ -102,9 +113,17 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         
         scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
 
-        return MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+        result: MachineLearningRunResult[TModel] = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+
+        self.__logger.info("finished run.")
+        self.__logger.log(END_RUN, result)
+
+        return result
 
     async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings) -> MachineLearningExperimentResult[TModel]:
+        self.__logger.log(f"running experiment {experiment_settings.name}...")
+        self.__logger.log(START_EXPERIMENT, experiment_settings)
+
         combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
         experiment_settings.evaluation_service_settings, experiment_settings.training_dataset_settings, experiment_settings.evaluation_dataset_settings, 
         experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
@@ -115,7 +134,12 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         completed, pending = await asyncio.wait(run_tasks)
 
-        return MachineLearningExperimentResult[TModel]([t.result() for t in completed])
+        result: MachineLearningExperimentResult[TModel] = MachineLearningExperimentResult[TModel]([t.result() for t in completed])
+
+        self.__logger.info(f"finished experiment {experiment_settings.name}.")
+        self.__logger.log(END_EXPERIMENT, result)
+
+        return result
 
     async def __run_experiment(self, experiment_settings: Tuple[str, MachineLearningExperimentSettings]) -> Tuple[str, MachineLearningExperimentResult[TModel]]:
         result = await self.run_experiment(experiment_settings[1])
@@ -123,8 +147,16 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         return (experiment_settings[0], result)
 
     async def run_experiments(self, experiment_settings: Dict[str, MachineLearningExperimentSettings]) -> Dict[str, MachineLearningExperimentResult[TModel]]:
+        self.__logger.info(f"running {len(experiment_settings)} experiments...")
+        self.__logger.log(START_EXPERIMENTS, experiment_settings)
+        
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, MachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
         completed, pending = await asyncio.wait(experiment_tasks)
 
-        return dict([t.result() for t in completed])
+        result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict([t.result() for t in completed])
+
+        self.__logger.info(f"finished all {len(experiment_settings)} experiments")
+        self.__logger.log(END_EXPERIMENTS, result)
+
+        return result

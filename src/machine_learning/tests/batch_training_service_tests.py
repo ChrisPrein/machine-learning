@@ -45,7 +45,7 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
 
     def test_train_valid_objectives_and_dataset_should_return_trained_model(self):
         evaluation_routine: Coroutine[Any, Any, Model[str, str]] = self.training_service.train(self.model, self.dataset, {}, 
-                    {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None, self.dataset)
+                    {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(evaluation_routine)
 
@@ -53,6 +53,6 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
 
         evaluation_routine: Coroutine[Any, Any, Model[str, str]] = self.training_service.train_on_multiple_datasets(self.model, datasets, {},
-            {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None, self.dataset)
+            {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(evaluation_routine)
