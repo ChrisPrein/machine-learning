@@ -5,6 +5,8 @@ from logging import Logger
 import logging
 from tokenize import Single
 from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from uuid import UUID
+import uuid
 from matplotlib.pyplot import eventplot
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
@@ -27,6 +29,8 @@ START_EXPERIMENT = 62
 END_EXPERIMENT = 63
 START_EXPERIMENTS = 64
 END_EXPERIMENTS = 65
+
+EXPERIMENTATION_LOGGER_NAME = "experimentation"
 
 nest_asyncio.apply()
 
@@ -57,7 +61,9 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     logger: Optional[Logger] = None):
 
         if logger is None:
-            logger = logging.getLogger()
+            self.__logger: Logger = logging.getLogger()
+        else:
+            self.__logger: Logger = logger.getChild(EXPERIMENTATION_LOGGER_NAME)
 
         if model_factory is None:
             raise ValueError("model_factory")
@@ -83,7 +89,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         if stop_condition_factory is None:
             raise ValueError("stop_condition_factory")
 
-        self.__logger: Logger = logger
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__model_factory: ModelFactoryAlias[TModel] = model_factory
         self.__training_service_factory: TrainingServiceFactoryAlias[TInput, TTarget, TModel] = training_service_factory
@@ -94,9 +99,13 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel] = objective_function_factory
         self.__stop_condition_factory: StopConditionFactoryAlias[TModel] = stop_condition_factory
 
-    async def __execute_run(self, run_settings: MachineLearningRunSettings) -> MachineLearningRunResult[TModel]:
-        self.__logger.info("executing run...")
-        self.__logger.log(START_RUN, run_settings)
+    async def __execute_run(self, run_settings: MachineLearningRunSettings, experiment_logger: Logger) -> MachineLearningRunResult[TModel]:
+        run_id: UUID = uuid.uuid4()
+
+        run_logger: Logger = experiment_logger.getChild(str(run_id))
+
+        run_logger.info("executing run...")
+        run_logger.log(START_RUN, run_settings)
 
         model: TModel = self.__model_factory(run_settings.model_settings)
 
@@ -115,14 +124,13 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         result: MachineLearningRunResult[TModel] = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
 
-        self.__logger.info("finished run.")
-        self.__logger.log(END_RUN, result)
+        run_logger.info("finished run.")
+        run_logger.log(END_RUN, result)
 
         return result
 
     async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings) -> MachineLearningExperimentResult[TModel]:
-        self.__logger.log(f"running experiment {experiment_settings.name}...")
-        self.__logger.log(START_EXPERIMENT, experiment_settings)
+        experiment_logger: Logger = self.__logger.getChild(experiment_settings.name)
 
         combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
         experiment_settings.evaluation_service_settings, experiment_settings.training_dataset_settings, experiment_settings.evaluation_dataset_settings, 
@@ -130,14 +138,17 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(*combination) for combination in combinations]
 
-        run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings) for run_settings in runs]
+        experiment_logger.log(f"running experiment {experiment_settings.name}...")
+        experiment_logger.log(START_EXPERIMENT, {"experiment_settings": experiment_settings, "runs": runs})
+
+        run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]
 
         completed, pending = await asyncio.wait(run_tasks)
 
         result: MachineLearningExperimentResult[TModel] = MachineLearningExperimentResult[TModel]([t.result() for t in completed])
 
-        self.__logger.info(f"finished experiment {experiment_settings.name}.")
-        self.__logger.log(END_EXPERIMENT, result)
+        experiment_logger.info(f"finished experiment {experiment_settings.name}.")
+        experiment_logger.log(END_EXPERIMENT, result)
 
         return result
 

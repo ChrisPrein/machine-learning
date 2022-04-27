@@ -1,3 +1,5 @@
+from logging import Logger
+import logging
 from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
@@ -7,12 +9,24 @@ import asyncio.tasks
 import asyncio.futures
 from dataset_handling.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
-
 import nest_asyncio
+
+STARTING_EVALUATION = 80
+FINISHED_EVALUATION = 81
+STARTING_MULTI_DATASET_EVALUATION = 82
+FINISHED_MULTI_DATASET_EVALUATION = 83
+
+EVALUATION_LOGGER_NAME = "evaluation"
+
 nest_asyncio.apply()
 
 class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, logger: Optional[Logger]=None, batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+        if logger is None:
+            self.__logger: Logger = logging.getLogger()
+        else:
+            self.__logger: Logger = logger.getChild(EVALUATION_LOGGER_NAME)
+        
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: Optional[int] = batch_size
         self.__drop_last: bool = drop_last
