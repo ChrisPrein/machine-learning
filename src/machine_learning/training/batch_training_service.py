@@ -70,8 +70,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 is_any_satisfied |= condition.is_satisfied(training_context)
 
                 if(is_any_satisfied):
-                    self.__logger(STOP_CONDITION_SATISFIED, {"training_context": training_context, "stop_condition_name": key, "stop_condition": condition})
-                    self.__logger('Condition named "{key}" is satisfied'.format(key=key))
+                    self.__logger.log(STOP_CONDITION_SATISFIED, {"training_context": training_context, "stop_condition_name": key, "stop_condition": condition})
+                    self.__logger.info('Condition named "{key}" is satisfied'.format(key=key))
                     break
 
         self.__logger.log(FINISHED_CHECKING_STOP_CONDITIONS, {"training_context": training_context, "stop_conditions": stop_conditions})

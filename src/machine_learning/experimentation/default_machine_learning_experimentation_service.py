@@ -133,7 +133,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         experiment_logger: Logger = self.__logger.getChild(experiment_settings.name)
 
         combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
-        experiment_settings.evaluation_service_settings, experiment_settings.training_dataset_settings, experiment_settings.evaluation_dataset_settings, 
+        experiment_settings.evaluation_service_settings, experiment_settings.evaluation_dataset_settings, experiment_settings.training_dataset_settings,  
         experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
 
         runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(*combination) for combination in combinations]
