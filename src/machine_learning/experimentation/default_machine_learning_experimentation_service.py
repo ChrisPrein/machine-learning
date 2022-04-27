@@ -138,7 +138,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(*combination) for combination in combinations]
 
-        experiment_logger.log(f"running experiment {experiment_settings.name}...")
+        experiment_logger.info(f"running experiment {experiment_settings.name}...")
         experiment_logger.log(START_EXPERIMENT, {"experiment_settings": experiment_settings, "runs": runs})
 
         run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]

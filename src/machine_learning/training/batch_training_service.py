@@ -153,6 +153,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             model = await self.__train(model, dataset, stop_conditions, objective_functions, primary_objective, validation_dataset, multi_training_run_logger)
 
         multi_training_run_logger.log(FINISHED_MULTI_DATASET_TRAINING, {"model": model, "dataset": datasets, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": self.__batch_size})
-        multi_training_run_logger.info(f"finished training on {len(datasets)} datasets")
+        multi_training_run_logger.info(f"finished training on {len(datasets)} datasets.")
 
         return model
