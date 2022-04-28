@@ -4,7 +4,7 @@ import itertools
 from logging import Logger
 import logging
 from tokenize import Single
-from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union, final
 from uuid import UUID
 import uuid
 from matplotlib.pyplot import eventplot
@@ -107,25 +107,30 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         run_logger.info("executing run...")
         run_logger.log(START_RUN, run_settings)
 
-        model: TModel = self.__model_factory(run_settings.model_settings)
+        result: MachineLearningRunResult[TModel] = None
 
-        training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
-        training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
-        stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
-        objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
+        try:
+            model: TModel = self.__model_factory(run_settings.model_settings)
 
-        model = await training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
+            training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
+            training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
+            stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
+            objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
-        evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
-        evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
-        evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
-        
-        scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
+            model = await training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
 
-        result: MachineLearningRunResult[TModel] = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+            evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
+            evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
+            evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
+            
+            scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
 
-        run_logger.info("finished run.")
-        run_logger.log(END_RUN, result)
+            result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+        except Exception as ex:
+            run_logger.error(ex)
+        finally:
+            run_logger.info("finished run.")
+            run_logger.log(END_RUN, result)
 
         return result
 
@@ -141,14 +146,17 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
         experiment_logger.log(START_EXPERIMENT, {"experiment_settings": experiment_settings, "runs": runs})
 
-        run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]
+        result: MachineLearningExperimentResult[TModel] = None
 
-        completed, pending = await asyncio.wait(run_tasks)
-
-        result: MachineLearningExperimentResult[TModel] = MachineLearningExperimentResult[TModel]([t.result() for t in completed])
-
-        experiment_logger.info(f"finished experiment {experiment_settings.name}.")
-        experiment_logger.log(END_EXPERIMENT, result)
+        try:
+            run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]
+            results: List[MachineLearningRunResult[TModel]] = await asyncio.gather(*run_tasks, loop=self.__event_loop)
+            result = MachineLearningExperimentResult[TModel](results)
+        except Exception as ex:
+            experiment_logger.critical(ex)
+        finally:
+            experiment_logger.info(f"finished experiment {experiment_settings.name}.")
+            experiment_logger.log(END_EXPERIMENT, result)
 
         return result
 
@@ -163,9 +171,9 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, MachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
-        completed, pending = await asyncio.wait(experiment_tasks)
+        results: List[Tuple[str, MachineLearningExperimentResult[TModel]]] = await asyncio.gather(*experiment_tasks, loop=self.__event_loop)
 
-        result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict([t.result() for t in completed])
+        result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict(results)
 
         self.__logger.info(f"finished all {len(experiment_settings)} experiments")
         self.__logger.log(END_EXPERIMENTS, result)

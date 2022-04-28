@@ -68,10 +68,10 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         evaluation_run_logger.info('Starting evaluation loop...')
 
         prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: self.__predict_batch(model, batch)) for batch in data_loader]
-        completed, pending = self.__event_loop.run_until_complete(asyncio.wait(prediction_futures))
+        predictions: List[List[Prediction]] = await asyncio.gather(*prediction_futures, loop=self.__event_loop)
 
-        for t in completed:
-            evaluation_context.predictions.extend(t.result()) 
+        for t in predictions:
+            evaluation_context.predictions.extend(t) 
 
         result: Dict[str, float] = {}
 
@@ -98,9 +98,9 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, float]]]] = [self.__evaluate(model, dataset, evaluation_metrics, multi_evaluation_run_logger) for dataset in evaluation_datasets.items()]
 
-        completed, pending = await asyncio.wait(experiment_tasks)
+        experiment_results: List[Tuple[str, Dict[str, float]]] = await asyncio.gather(*experiment_tasks, loop=self.__event_loop)
 
-        results = dict([t.result() for t in completed])
+        results = dict(experiment_results)
 
         multi_evaluation_run_logger.log(FINISHED_MULTI_DATASET_EVALUATION, {"model": model, "evaluation_datasets": evaluation_datasets, "evaluation_metrics": evaluation_metrics, "results": results, "batch_size": self.__batch_size})
         multi_evaluation_run_logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
