@@ -150,7 +150,11 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         try:
             run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]
-            results: List[MachineLearningRunResult[TModel]] = await asyncio.gather(*run_tasks, loop=self.__event_loop)
+            results: List[MachineLearningRunResult[TModel]] = []
+            
+            for run_task in run_tasks:
+                results.append(await run_task)
+
             result = MachineLearningExperimentResult[TModel](results)
         except Exception as ex:
             experiment_logger.critical(ex)
@@ -171,7 +175,10 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, MachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
-        results: List[Tuple[str, MachineLearningExperimentResult[TModel]]] = await asyncio.gather(*experiment_tasks, loop=self.__event_loop)
+        results: List[Tuple[str, MachineLearningExperimentResult[TModel]]] = []
+        
+        for experiment_task in experiment_tasks:
+            results.append(await experiment_task)
 
         result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict(results)
 
