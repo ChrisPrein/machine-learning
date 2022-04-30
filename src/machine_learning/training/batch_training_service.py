@@ -103,8 +103,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         batch_size: int = len(dataset) if self.__batch_size is None else self.__batch_size
         training_context: TrainingContext[TModel] = TrainingContext[TModel](model=model, scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, current_epoch=0, current_iteration=0)
-        training_size: int = int(len(dataset) * self.__training_dataset_size_ratio)
-        validation_size: int = int(len(dataset) - training_size)
 
         current_dataset: Dataset[Tuple[TInput, TTarget]] = None
 
@@ -112,6 +110,9 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             current_dataset = dataset[1]
         else:
             current_dataset = dataset
+
+        training_size: int = int(len(current_dataset) * self.__training_dataset_size_ratio)
+        validation_size: int = int(len(current_dataset) - training_size)
 
         if validation_dataset is None: 
             training_dataset, validation_dataset = random_split(current_dataset, [training_size, validation_size])
