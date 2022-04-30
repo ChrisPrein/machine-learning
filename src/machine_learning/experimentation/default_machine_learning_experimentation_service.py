@@ -1,16 +1,18 @@
 from ast import Call
 import asyncio
+from audioop import mul
 import itertools
 from logging import Logger
 import logging
-from tokenize import Single
+from multiprocessing.dummy import Pool
 from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union, final
 from uuid import UUID
 import uuid
-from matplotlib.pyplot import eventplot
+from py import process
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
-from multipledispatch import dispatch
+import dill
+import pathos.multiprocessing as multiprocessing
 
 from .abstractions.instance_factory import InstanceFactory
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric, EvaluationContext, TModel
@@ -58,7 +60,9 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel],
     stop_condition_factory: StopConditionFactoryAlias[TModel],
     event_loop: Optional[asyncio.AbstractEventLoop] = None,
-    logger: Optional[Logger] = None):
+    logger: Optional[Logger] = None, 
+    process_pool: Optional[multiprocessing.ProcessPool] = None,
+    run_logger_factory: Optional[Callable[[str, UUID], Logger]] = None):
 
         if logger is None:
             self.__logger: Logger = logging.getLogger()
@@ -89,7 +93,9 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         if stop_condition_factory is None:
             raise ValueError("stop_condition_factory")
 
+        self.__pool: multiprocessing.ProcessPool = process_pool if not process_pool is None else multiprocessing.ProcessPool(4)
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
+        self.__run_logger_factory: Callable[[str, UUID], Logger] = run_logger_factory if not run_logger_factory is None else lambda experiment_name, uuid: logging.getLogger(str(uuid))
         self.__model_factory: ModelFactoryAlias[TModel] = model_factory
         self.__training_service_factory: TrainingServiceFactoryAlias[TInput, TTarget, TModel] = training_service_factory
         self.__evaluation_service_factory: EvaluationServiceFactoryAlias[TInput, TTarget, TModel] = evaluation_service_factory
@@ -99,10 +105,20 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel] = objective_function_factory
         self.__stop_condition_factory: StopConditionFactoryAlias[TModel] = stop_condition_factory
 
-    async def __execute_run(self, run_settings: MachineLearningRunSettings, experiment_logger: Logger) -> MachineLearningRunResult[TModel]:
+    def __getstate__(self):
+        self_dict = self.__dict__.copy()
+        del self_dict['_DefaultMachineLearningExperimentationService__pool']
+        del self_dict['_DefaultMachineLearningExperimentationService__event_loop']
+        return self_dict
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+    def __execute_run(self, run_settings: MachineLearningRunSettings) -> MachineLearningRunResult[TModel]:
         run_id: UUID = uuid.uuid4()
 
-        run_logger: Logger = experiment_logger.getChild(str(run_id))
+        run_logger: Logger = self.__run_logger_factory(run_settings.experiment_name, run_id)
+        event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
 
         run_logger.info("executing run...")
         run_logger.log(START_RUN, run_settings)
@@ -117,13 +133,13 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
             stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
             objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
-            model = await training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions)
+            model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
 
             evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
             evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
             evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
             
-            scores: Dict[str, Dict[str, float]] = await evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics)
+            scores: Dict[str, Dict[str, float]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
 
             result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
         except Exception as ex:
@@ -141,7 +157,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         experiment_settings.evaluation_service_settings, experiment_settings.evaluation_dataset_settings, experiment_settings.training_dataset_settings,  
         experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
 
-        runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(*combination) for combination in combinations]
+        runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(experiment_settings.name, *combination) for combination in combinations]
 
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
         experiment_logger.log(START_EXPERIMENT, {"experiment_settings": experiment_settings, "runs": runs})
@@ -149,11 +165,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         result: MachineLearningExperimentResult[TModel] = None
 
         try:
-            run_tasks: List[Coroutine[Any, Any, MachineLearningRunResult[TModel]]] = [self.__execute_run(run_settings, experiment_logger) for run_settings in runs]
-            results: List[MachineLearningRunResult[TModel]] = []
-            
-            for run_task in run_tasks:
-                results.append(await run_task)
+            results: List[MachineLearningRunResult[TModel]] = self.__pool.map(self.__execute_run, runs)
 
             result = MachineLearningExperimentResult[TModel](results)
         except Exception as ex:
@@ -175,10 +187,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, MachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
-        results: List[Tuple[str, MachineLearningExperimentResult[TModel]]] = []
-        
-        for experiment_task in experiment_tasks:
-            results.append(await experiment_task)
+        results: List[Tuple[str, MachineLearningExperimentResult[TModel]]] = await asyncio.gather(*experiment_tasks)
 
         result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict(results)
 

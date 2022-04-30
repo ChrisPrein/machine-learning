@@ -31,6 +31,7 @@ class MachineLearningExperimentSettings(ExperimentSettings):
 
 @dataclass    
 class MachineLearningRunSettings():    
+    experiment_name: str
     model_settings: InstanceSettings
     training_service_settings: InstanceSettings
     evaluation_service_settings: InstanceSettings

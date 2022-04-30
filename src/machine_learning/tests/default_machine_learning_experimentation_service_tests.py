@@ -28,18 +28,25 @@ class DefaultMachineLearningExperimentationTestCase(unittest.TestCase):
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(100)]
 
         self.model: Model[str, str] = AsyncMock(spec=Model)
+        self.model.__class__ = AsyncMock
 
         self.objective_function: ObjectiveFunction[str, str, Model[str, str]] = AsyncMock(spec=ObjectiveFunction)
+        self.objective_function.__class__ = AsyncMock
 
         self.stop_condition: StopCondition[Model[str, str]] = AsyncMock(spec=StopCondition)
+        self.stop_condition.__class__ = AsyncMock
 
         self.evaluation_metric: EvaluationMetric[str, str, Model[str, str]] = AsyncMock(spec=EvaluationMetric)
+        self.stop_condition.__class__ = AsyncMock
 
         self.evaluation_service: EvaluationService[str, str, Model[str, str]] = AsyncMock(spec=EvaluationService)
+        self.evaluation_service.__class__ = AsyncMock
 
         self.training_service: TrainingService[str, str, Model[str, str]] = AsyncMock(spec=TrainingService)
+        self.training_service.__class__ = AsyncMock
 
         self.dataset: Dataset[Tuple[str, str]] = AsyncMock()
+        self.dataset.__class__ = AsyncMock
 
         self.event_loop = asyncio.get_event_loop()
 
