@@ -1,7 +1,7 @@
 from abc import ABC
 from logging import Logger
 import logging
-from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
+from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -78,7 +78,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__logger.info("Finished checking stop conditions.")
         return is_any_satisfied
 
-    async def train(self, model: TModel, dataset: Dataset[Tuple[TInput, TTarget]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Dataset[Tuple[TInput, TTarget]]] = None, logger: Optional[Logger] = None) -> TModel:
+    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Dataset[Tuple[TInput, TTarget]]] = None, logger: Optional[Logger] = None) -> TModel:
         training_run_id: UUID = uuid.uuid4()
 
         if logger is None:
@@ -106,10 +106,17 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         training_size: int = int(len(dataset) * self.__training_dataset_size_ratio)
         validation_size: int = int(len(dataset) - training_size)
 
-        if validation_dataset is None: 
-            training_dataset, validation_dataset = random_split(dataset, [training_size, validation_size])
+        current_dataset: Dataset[Tuple[TInput, TTarget]] = None
+
+        if isinstance(dataset, Tuple):
+            current_dataset = dataset[1]
         else:
-            training_dataset = dataset
+            current_dataset = dataset
+
+        if validation_dataset is None: 
+            training_dataset, validation_dataset = random_split(current_dataset, [training_size, validation_size])
+        else:
+            training_dataset = current_dataset
 
         training_data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=training_dataset, batch_size=batch_size, drop_last=self.__drop_last)
         training_run_logger.log(STARTING_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
@@ -136,8 +143,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         return model
 
-    async def __train(self, model: TModel, dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Dataset[Tuple[TInput, TTarget]]] = None, logger: Optional[Logger] = None) -> TModel:
-        result = await self.train(model, dataset[1], stop_conditions, objective_functions, primary_objective, validation_dataset, logger)
+    async def __train(self, model: TModel, dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], logger: Logger, primary_objective: Optional[str] = None, validation_dataset: Optional[Dataset[Tuple[TInput, TTarget]]] = None) -> TModel:
+        result = await self.train(model, dataset, stop_conditions, objective_functions, primary_objective, validation_dataset, logger)
 
         return result
 
@@ -150,7 +157,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         multi_training_run_logger.info(f"starting training on {len(datasets)} datasets...")
         
         for dataset in datasets.items():
-            model = await self.__train(model, dataset, stop_conditions, objective_functions, primary_objective, validation_dataset, multi_training_run_logger)
+            model = await self.__train(model, dataset, stop_conditions, objective_functions, multi_training_run_logger, primary_objective, validation_dataset)
 
         multi_training_run_logger.log(FINISHED_MULTI_DATASET_TRAINING, {"model": model, "dataset": datasets, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": self.__batch_size})
         multi_training_run_logger.info(f"finished training on {len(datasets)} datasets.")

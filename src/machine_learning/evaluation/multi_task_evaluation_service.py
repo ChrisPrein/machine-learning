@@ -1,6 +1,6 @@
 from logging import Logger
 import logging
-from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple
+from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
 from uuid import UUID
 import uuid
 from ..modeling.abstractions.model import Model, TInput, TTarget
@@ -42,7 +42,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         return [Prediction(result[0], result[1], result[2]) for result in combined]
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Dataset[Tuple[TInput, TTarget]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> Dict[str, float]:
+    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> Dict[str, float]:
         evaluation_run_id: UUID = uuid.uuid4()
 
         if logger is None:
@@ -62,7 +62,15 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         batch_size: int = len(evaluation_dataset) if self.__batch_size is None else self.__batch_size
 
         evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, [])
-        data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=evaluation_dataset, batch_size=batch_size, drop_last=self.__drop_last)
+
+        dataset: Dataset[Tuple[TInput, TTarget]] = None
+
+        if isinstance(evaluation_dataset, Tuple):
+            dataset = evaluation_dataset[1]
+        else:
+            dataset = evaluation_dataset
+
+        data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=batch_size, drop_last=self.__drop_last)
 
         evaluation_run_logger.log(STARTING_EVALUATION, {"model": model, "evaluation_dataset": evaluation_dataset, "evaluation_metrics": evaluation_metrics, "batch_size": batch_size})
         evaluation_run_logger.info('Starting evaluation loop...')
@@ -83,8 +91,8 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         return result
 
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> Tuple[str, Dict[str, float]]:
-        result = await self.evaluate(model, evaluation_dataset[1], evaluation_metrics, logger)
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Logger) -> Tuple[str, Dict[str, float]]:
+        result = await self.evaluate(model, evaluation_dataset, evaluation_metrics, logger)
 
         return (evaluation_dataset[0], result)
 
