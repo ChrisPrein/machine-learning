@@ -43,7 +43,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             self.__logger: Logger = logger.getChild(TRAINING_LOGGER_NAME)
 
         if evaluation_service is None:
-            evaluation_service = MultiTaskEvaluationService[TInput, TTarget, TModel](batch_size=batch_size, drop_last=drop_last, event_loop=event_loop)
+            evaluation_service = MultiTaskEvaluationService[TInput, TTarget, TModel](logger=self.__logger, batch_size=batch_size, drop_last=drop_last, event_loop=event_loop)
         
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__max_epochs: int = max_epochs
