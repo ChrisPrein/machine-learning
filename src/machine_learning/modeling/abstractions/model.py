@@ -7,14 +7,6 @@ TTarget = TypeVar('TTarget')
 class Model(Generic[TInput, TTarget], ABC):
 
     @abstractmethod
-    def start_training(self):
-        pass
-
-    @abstractmethod
-    def end_training(self):
-        pass
-
-    @abstractmethod
     def train(self, input: TInput, target: TTarget):
         pass
 

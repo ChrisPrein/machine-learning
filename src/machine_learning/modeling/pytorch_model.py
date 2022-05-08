@@ -18,23 +18,7 @@ class PytorchModel(Model[TInput, TTarget]):
         self.optimizer: Optional[torch.optim.Optimizer] = optimizer if isinstance(optimizer, torch.optim.Optimizer) else None
         self.scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = scheduler if isinstance(scheduler, torch.optim.lr_scheduler._LRScheduler) else None
 
-        self._is_training_in_progress: bool = False
-
-    def start_training(self):
-        self._is_training_in_progress = True
-
-        if not self.optimizer_factory is None:
-            self.optimizer = self.optimizer_factory()
-
-        if not self.scheduler_factory is None:
-            self.scheduler = self.scheduler_factory()
-
-    def end_training(self):
-        self._is_training_in_progress = False
-
     def train(self, input: TInput, target: TTarget):
-        if not self._is_training_in_progress:
-            raise NoTrainingInProgressException("Training has to be started before calling train.")
 
         self.inner_module.train(True)
 
@@ -48,15 +32,10 @@ class PytorchModel(Model[TInput, TTarget]):
 
         self.optimizer.step()
 
-        if not self.scheduler is None:
-            self.scheduler.step()
-        
         self.inner_module.train(False)
 
 
     def train_batch(self, input_batch: List[TInput], target_batch: List[TTarget]):
-        if not self._is_training_in_progress:
-            raise NoTrainingInProgressException("Training has to be started before calling train_batch.")
 
         self.inner_module.train(True)
         
@@ -70,9 +49,6 @@ class PytorchModel(Model[TInput, TTarget]):
 
         self.optimizer.step()
 
-        if not self.scheduler is None:
-            self.scheduler.step()
-        
         self.inner_module.train(False)
 
     def predict(self, input: TInput) -> TTarget:

@@ -12,6 +12,9 @@ import torch
 from torch.utils.data import Dataset, random_split
 from multidispatch import multimethod, multifunction
 import nest_asyncio
+import zope.event
+
+from machine_learning.modeling.pytorch_model import PytorchModel
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
@@ -123,6 +126,9 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         training_run_logger.log(STARTING_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
         training_run_logger.info('Starting training loop...')
 
+        if isinstance(model, PytorchModel) and not model.scheduler_factory is None:
+            model.scheduler = model.scheduler_factory()
+
         while not self.is_any_stop_condition_satisfied(training_context=training_context, stop_conditions=stop_conditions):
             training_context.current_epoch += 1
 
@@ -135,6 +141,9 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             training_run_logger.info("Evaluating current model.")
             evaluation_scores: Dict[str, float] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=objective_functions)
             training_run_logger.info("finished evaluating current model.")
+
+            if isinstance(model, PytorchModel) and not model.scheduler is None:
+                model.scheduler.step()
 
             for key, evaluation_score in evaluation_scores.items():
                 training_context.scores[key].append(Score(epoch=training_context.current_epoch, iteration=training_context.current_iteration, score=evaluation_score, optimization_type=objective_functions[key].optimization_type))
