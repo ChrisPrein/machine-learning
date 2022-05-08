@@ -3,7 +3,7 @@ import asyncio
 from dataclasses import dataclass
 from re import S
 import unittest
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 from torch.utils.data import Dataset
 from dataset_handling.dataloader import DataLoader
 from typing import Any, Coroutine, List, Dict, Tuple
@@ -28,7 +28,7 @@ class PytorchModelTestCase(unittest.TestCase):
         self.module.__init__ = Mock(return_value=None)
         self.module.train = Mock()
 
-        self.optimizer: Optimizer = self.optimizer_patcher.start()
+        self.optimizer: Optimizer = MagicMock(spec=Optimizer)
 
         self.optimizer.zero_grad = Mock()
         self.optimizer.step = Mock()
@@ -49,7 +49,11 @@ class PytorchModelTestCase(unittest.TestCase):
         self.loss_function_patcher.stop()
 
     def test_train_small_dataset_should_set_model_to_train_and_call_it(self):
+        self.model.start_training()
+        
         self.model.train(input=self.inputs[0], target=self.targets[0])
+
+        self.model.end_training()
 
         self.module.train.assert_called()
         self.module.__init__.assert_called()
@@ -60,7 +64,11 @@ class PytorchModelTestCase(unittest.TestCase):
 
 
     def test_train_batch_small_dataset_should_set_model_to_train_and_call_it(self):
+        self.model.start_training()
+        
         self.model.train_batch(input_batch=self.inputs, target_batch=self.targets)
+
+        self.model.end_training()
 
         self.module.train.assert_called()
         self.module.__init__.assert_called()
