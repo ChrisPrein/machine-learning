@@ -1,7 +1,7 @@
 from abc import ABC
 from logging import Logger
 import logging
-from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
+from typing import Any, Callable, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -33,13 +33,23 @@ STARTING_TRAINING = 75
 FINISHED_TRAINING = 76
 STARTING_MULTI_DATASET_TRAINING = 77
 FINISHED_MULTI_DATASET_TRAINING = 78
+LOSS = 79
 
 TRAINING_LOGGER_NAME = "training"
 
 nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
-    def __init__(self, logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8):
+    def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]]], logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
+    batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
+    max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None,
+    post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, 
+    post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None,
+    post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None):
+        
+        if train_hook is None:
+            raise ValueError("train_hook")
+        
         if logger is None:
             self.__logger: Logger = logging.getLogger()
         else:
@@ -55,6 +65,14 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__drop_last: bool = drop_last
         self.__evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]] = evaluation_service
         self.__training_dataset_size_ratio: float = training_dataset_size_ratio
+
+        self.__train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]]] = train_hook
+        self.__pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_loop_hook
+        self.__post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_loop_hook
+        self.__pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_epoch_hook
+        self.__post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_epoch_hook
+        self.__pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_train_hook
+        self.__post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_train_hook
 
     def is_any_stop_condition_satisfied(self, training_context: TrainingContext[TModel], stop_conditions: Dict[str, StopCondition[TModel]]) -> bool:
         self.__logger.log(CHECKING_STOP_CONDITIONS, {"training_context": training_context, "stop_conditions": stop_conditions})
@@ -126,30 +144,51 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         training_run_logger.log(STARTING_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
         training_run_logger.info('Starting training loop...')
 
-        if isinstance(model, PytorchModel) and not model.scheduler_factory is None:
-            model.scheduler = model.scheduler_factory()
+        if not self.__pre_loop_hook is None:
+            training_run_logger.debug("Executing pre loop hook.")
+            self.__pre_loop_hook(training_run_logger, training_context)
 
         while not self.is_any_stop_condition_satisfied(training_context=training_context, stop_conditions=stop_conditions):
             training_context.current_epoch += 1
 
+            if not self.__pre_epoch_hook is None:
+                training_run_logger.debug("Executing pre epoch hook.")
+                self.__pre_train_hook(training_run_logger, training_context)
+
             for batch_index, batch in enumerate(training_data_loader):
                 training_context.current_iteration += 1
+
+                if not self.__pre_train_hook is None:
+                    training_run_logger.debug("Executing pre training hook.")
+                    self.__pre_train_hook(training_run_logger, training_context)
+
                 inputs: List[TInput] = [value[0] for value in batch]
                 targets: List[TTarget] = [value[1] for value in batch]
-                model.train_batch(input_batch=inputs, target_batch=targets)
+
+                training_run_logger.debug("Executing training hook.")
+                self.__train_hook(training_run_logger, training_context, inputs, targets)
+
+                if not self.__post_train_hook is None:
+                    training_run_logger.debug("Executing post training hook.")
+                    self.__post_train_hook(training_run_logger, training_context)
 
             training_run_logger.info("Evaluating current model.")
             evaluation_scores: Dict[str, float] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=objective_functions)
             training_run_logger.info("finished evaluating current model.")
 
-            if isinstance(model, PytorchModel) and not model.scheduler is None:
-                model.scheduler.step()
-
             for key, evaluation_score in evaluation_scores.items():
                 training_context.scores[key].append(Score(epoch=training_context.current_epoch, iteration=training_context.current_iteration, score=evaluation_score, optimization_type=objective_functions[key].optimization_type))
 
+            if not self.__post_epoch_hook is None:
+                training_run_logger.debug("Executing post epoch hook.")
+                self.__post_epoch_hook(training_run_logger, training_context)
+
         training_run_logger.log(FINISHED_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
         training_run_logger.info("Finished training loop.")
+
+        if not self.__post_loop_hook is None:
+            training_run_logger.debug("Executing post loop hook.")
+            self.__post_loop_hook(training_run_logger, training_context)
 
         return model
 
