@@ -8,13 +8,8 @@ import asyncio.futures
 from uuid import UUID
 import uuid
 from dataset_handling.dataloader import DataLoader
-import torch
 from torch.utils.data import Dataset, random_split
-from multidispatch import multimethod, multifunction
 import nest_asyncio
-import zope.event
-
-from machine_learning.modeling.pytorch_model import PytorchModel
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
@@ -40,12 +35,12 @@ TRAINING_LOGGER_NAME = "training"
 nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
-    def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]]], logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
+    def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]], None], logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
     batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
-    max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None,
-    post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, 
-    post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None,
-    post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = None):
+    max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
+    post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, 
+    post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
+    post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None):
         
         if train_hook is None:
             raise ValueError("train_hook")
