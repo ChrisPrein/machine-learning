@@ -119,34 +119,34 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         run_logger: Logger = self.__run_logger_factory(run_settings.experiment_name, run_id, run_settings)
         event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-
-        run_logger.info("executing run...")
-        run_logger.log(START_RUN, run_settings)
-
         result: MachineLearningRunResult[TModel] = None
 
-        try:
-            model: TModel = self.__model_factory(run_settings.model_settings)
+        with run_logger:
+            try:
+                run_logger.info("executing run...")
+                run_logger.log(START_RUN, run_settings)
 
-            training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
-            training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
-            stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
-            objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
+                model: TModel = self.__model_factory(run_settings.model_settings)
 
-            model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
+                training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
+                training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
+                stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
+                objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
-            evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
-            evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
-            evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
-            
-            scores: Dict[str, Dict[str, float]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
+                model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
 
-            result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
-        except Exception as ex:
-            run_logger.error(ex)
-        finally:
-            run_logger.info("finished run.")
-            run_logger.log(END_RUN, result)
+                evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
+                evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
+                evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
+                
+                scores: Dict[str, Dict[str, float]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
+
+                result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+            except Exception as ex:
+                run_logger.error(ex)
+            finally:
+                run_logger.info("finished run.")
+                run_logger.log(END_RUN, result)
 
         return result
 
