@@ -36,7 +36,7 @@ nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]], None], logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
-    batch_size: Optional[int] = None, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
+    batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
     max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
     post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, 
     post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
@@ -56,7 +56,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__max_epochs: int = max_epochs
         self.__max_iterations: int = max_iterations
-        self.__batch_size: Optional[int] = batch_size
+        self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
         self.__evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]] = evaluation_service
         self.__training_dataset_size_ratio: float = training_dataset_size_ratio
@@ -117,7 +117,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if primary_objective is None:
             primary_objective = list(objective_functions.keys())[0]
 
-        batch_size: int = len(dataset) if self.__batch_size is None else self.__batch_size
         training_context: TrainingContext[TModel] = TrainingContext[TModel](model=model, scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, current_epoch=0, current_iteration=0)
 
         current_dataset: Dataset[Tuple[TInput, TTarget]] = None
@@ -135,8 +134,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         else:
             training_dataset = current_dataset
 
-        training_data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=training_dataset, batch_size=batch_size, drop_last=self.__drop_last)
-        training_run_logger.log(STARTING_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
+        training_data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=training_dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
+        training_run_logger.log(STARTING_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": self.__batch_size})
         training_run_logger.info('Starting training loop...')
 
         if not self.__pre_loop_hook is None:
@@ -178,7 +177,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 training_run_logger.debug("Executing post epoch hook.")
                 self.__post_epoch_hook(training_run_logger, training_context)
 
-        training_run_logger.log(FINISHED_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": batch_size})
+        training_run_logger.log(FINISHED_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": self.__batch_size})
         training_run_logger.info("Finished training loop.")
 
         if not self.__post_loop_hook is None:
