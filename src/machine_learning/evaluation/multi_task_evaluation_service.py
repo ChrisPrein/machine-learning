@@ -24,7 +24,7 @@ EVALUATION_LOGGER_NAME = "evaluation"
 nest_asyncio.apply()
 
 class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, evaluation_hook: Callable[[TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, evaluation_hook: Callable[[Logger, TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         if logger is None:
             self.__logger: Logger = logging.getLogger()
         else:
@@ -36,7 +36,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
-        self.__evaluation_hook: Callable[[TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
+        self.__evaluation_hook: Callable[[Logger, TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
 
     def __predict_batch(self, model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
         inputs: List[TInput] = [sample[0] for sample in batch]
