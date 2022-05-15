@@ -41,7 +41,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     def __predict_batch(self, model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TInput] = [sample[1] for sample in batch]
-        predictions: List[TTarget] = self.__evaluation_hook(model, inputs, targets)
+        predictions: List[TTarget] = self.__evaluation_hook(self.__logger, model, inputs, targets)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 

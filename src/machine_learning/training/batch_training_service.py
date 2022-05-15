@@ -11,13 +11,14 @@ from dataset_handling.dataloader import DataLoader
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
 
+from ..evaluation.default_evaluation import default_evaluation
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
 from ..evaluation.abstractions.evaluation_metric import EvaluationContext, TModel
-from..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
+from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 
 CHECKING_STOP_CONDITIONS = 70
 FINISHED_CHECKING_STOP_CONDITIONS = 71
@@ -35,7 +36,9 @@ TRAINING_LOGGER_NAME = "training"
 nest_asyncio.apply()
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
-    def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]], None], logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
+    def __init__(self, train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]], None], 
+    evaluation_hook: Callable[[Logger, TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, 
+    evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
     batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
     max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
     post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, 
@@ -51,7 +54,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             self.__logger: Logger = logger.getChild(TRAINING_LOGGER_NAME)
 
         if evaluation_service is None:
-            evaluation_service = MultiTaskEvaluationService[TInput, TTarget, TModel](logger=self.__logger, batch_size=batch_size, drop_last=drop_last, event_loop=event_loop)
+            evaluation_service = MultiTaskEvaluationService[TInput, TTarget, TModel](logger=self.__logger, batch_size=batch_size, drop_last=drop_last, event_loop=event_loop, evaluation_hook=evaluation_hook)
         
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__max_epochs: int = max_epochs
