@@ -143,7 +143,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
                 result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
             except Exception as ex:
-                run_logger.error(ex)
+                run_logger.exception(msg=ex, exc_info=True, stack_info=True)
             finally:
                 run_logger.info("finished run.")
                 run_logger.log(END_RUN, result)
@@ -169,7 +169,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
             result = MachineLearningExperimentResult[TModel](results)
         except Exception as ex:
-            experiment_logger.critical(ex)
+            experiment_logger.critical(msg=ex, exc_info=True, stack_info=True)
         finally:
             experiment_logger.info(f"finished experiment {experiment_settings.name}.")
             experiment_logger.log(END_EXPERIMENT, result)
