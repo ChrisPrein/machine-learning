@@ -39,7 +39,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
     max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
     post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, 
-    post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
+    post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel], Dataset[Tuple[TInput, TTarget]]], None]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None,
     post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = None):
         
         if train_hook is None:
@@ -61,13 +61,13 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__evaluation_service: EvaluationService[TInput, TTarget, TModel, EvaluationContext[TInput, TTarget, TModel]] = evaluation_service
         self.__training_dataset_size_ratio: float = training_dataset_size_ratio
 
-        self.__train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]]] = train_hook
-        self.__pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_loop_hook
-        self.__post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_loop_hook
-        self.__pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_epoch_hook
-        self.__post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_epoch_hook
-        self.__pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = pre_train_hook
-        self.__post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]]]] = post_train_hook
+        self.__train_hook: Callable[[Logger, TrainingContext[TModel], List[TInput], List[TTarget]], None] = train_hook
+        self.__pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = pre_loop_hook
+        self.__post_loop_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = post_loop_hook
+        self.__pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = pre_epoch_hook
+        self.__post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TModel], Dataset[Tuple[TInput, TTarget]]], None]] = post_epoch_hook
+        self.__pre_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = pre_train_hook
+        self.__post_train_hook: Optional[Callable[[Logger, TrainingContext[TModel]], None]] = post_train_hook
 
     def is_any_stop_condition_satisfied(self, training_context: TrainingContext[TModel], stop_conditions: Dict[str, StopCondition[TModel]]) -> bool:
         self.__logger.log(CHECKING_STOP_CONDITIONS, {"training_context": training_context, "stop_conditions": stop_conditions})
@@ -175,7 +175,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             if not self.__post_epoch_hook is None:
                 training_run_logger.debug("Executing post epoch hook.")
-                self.__post_epoch_hook(training_run_logger, training_context)
+                self.__post_epoch_hook(training_run_logger, training_context, validation_dataset)
 
         training_run_logger.log(FINISHED_TRAINING, {"model": model, "dataset": dataset, "stop_conditions": stop_conditions, "objective_functions": objective_functions, "primary_objective": primary_objective, "batch_size": self.__batch_size})
         training_run_logger.info("Finished training loop.")

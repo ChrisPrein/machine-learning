@@ -1,11 +1,12 @@
 from logging import Logger
 import logging
-from typing import Any, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
+from typing import Any, Callable, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
 from uuid import UUID
 import uuid
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService
+from .default_evaluation import default_evaluation
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -23,20 +24,24 @@ EVALUATION_LOGGER_NAME = "evaluation"
 nest_asyncio.apply()
 
 class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, evaluation_hook: Callable[[TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         if logger is None:
             self.__logger: Logger = logging.getLogger()
         else:
             self.__logger: Logger = logger.getChild(EVALUATION_LOGGER_NAME)
+
+        if evaluation_hook is None:
+            raise ValueError("evaluation_hook")
         
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
+        self.__evaluation_hook: Callable[[TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
 
     def __predict_batch(self, model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TInput] = [sample[1] for sample in batch]
-        predictions: List[TTarget] = model.predict_batch(input_batch=inputs)
+        predictions: List[TTarget] = self.__evaluation_hook(model, inputs, targets)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
