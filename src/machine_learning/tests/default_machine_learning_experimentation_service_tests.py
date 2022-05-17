@@ -33,7 +33,7 @@ class DefaultMachineLearningExperimentationTestCase(unittest.TestCase):
         self.objective_function: ObjectiveFunction[str, str, Model[str, str]] = AsyncMock(spec=ObjectiveFunction)
         self.objective_function.__class__ = AsyncMock
 
-        self.stop_condition: StopCondition[Model[str, str]] = AsyncMock(spec=StopCondition)
+        self.stop_condition: StopCondition[str, str, Model[str, str]] = AsyncMock(spec=StopCondition)
         self.stop_condition.__class__ = AsyncMock
 
         self.evaluation_metric: EvaluationMetric[str, str, Model[str, str]] = AsyncMock(spec=EvaluationMetric)

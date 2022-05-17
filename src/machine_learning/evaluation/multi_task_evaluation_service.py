@@ -3,6 +3,8 @@ import logging
 from typing import Any, Callable, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
 from uuid import UUID
 import uuid
+
+from attr import asdict
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService
@@ -13,11 +15,6 @@ import asyncio.futures
 from dataset_handling.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 import nest_asyncio
-
-STARTING_EVALUATION = 80
-FINISHED_EVALUATION = 81
-STARTING_MULTI_DATASET_EVALUATION = 82
-FINISHED_MULTI_DATASET_EVALUATION = 83
 
 EVALUATION_LOGGER_NAME = "evaluation"
 
@@ -47,14 +44,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         return [Prediction(result[0], result[1], result[2]) for result in combined]
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> Dict[str, float]:
-        evaluation_run_id: UUID = uuid.uuid4()
-
-        if logger is None:
-            evaluation_run_logger: Logger = self.__logger.getChild(str(evaluation_run_id))
-        else:
-            evaluation_run_logger: Logger = logger.getChild(str(evaluation_run_id))
-        
+    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, float]:
         if model is None:
             raise ValueError("model")
 
@@ -75,8 +65,7 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
-        evaluation_run_logger.log(STARTING_EVALUATION, {"model": model, "evaluation_dataset": evaluation_dataset, "evaluation_metrics": evaluation_metrics, "batch_size": self.__batch_size})
-        evaluation_run_logger.info('Starting evaluation loop...')
+        self.__logger.info('Starting evaluation loop...')
 
         prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: self.__predict_batch(model, batch)) for batch in data_loader]
         predictions: List[List[Prediction]] = await asyncio.gather(*prediction_futures, loop=self.__event_loop)
@@ -89,31 +78,25 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
             result[name] = evaluation_metric.calculate_score(context=evaluation_context)
 
-        evaluation_run_logger.log(FINISHED_EVALUATION, {"model": model, "evaluation_dataset": evaluation_dataset, "evaluation_context": evaluation_context, "evaluation_metrics": evaluation_metrics, "result": result, "batch_size": self.__batch_size})
-        evaluation_run_logger.info('Finished evaluation loop.')
+        self.__logger.info('Finished evaluation loop.')
+        self.__logger.info(evaluation_context)
 
         return result
 
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Logger) -> Tuple[str, Dict[str, float]]:
-        result = await self.evaluate(model, evaluation_dataset, evaluation_metrics, logger)
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Tuple[str, Dict[str, float]]:
+        result = await self.evaluate(model, evaluation_dataset, evaluation_metrics)
 
         return (evaluation_dataset[0], result)
 
     async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, float]]:
-        multi_evaluation_run_id: UUID = uuid.uuid4()
-
-        multi_evaluation_run_logger: Logger = self.__logger.getChild(str(multi_evaluation_run_id))
-
-        multi_evaluation_run_logger.log(STARTING_MULTI_DATASET_EVALUATION, {"model": model, "evaluation_datasets": evaluation_datasets, "evaluation_metrics": evaluation_metrics, "batch_size": self.__batch_size})
-        multi_evaluation_run_logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
+        self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
         
-        experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, float]]]] = [self.__evaluate(model, dataset, evaluation_metrics, multi_evaluation_run_logger) for dataset in evaluation_datasets.items()]
+        experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, float]]]] = [self.__evaluate(model, dataset, evaluation_metrics, self.__logger) for dataset in evaluation_datasets.items()]
 
         experiment_results: List[Tuple[str, Dict[str, float]]] = await asyncio.gather(*experiment_tasks, loop=self.__event_loop)
 
         results = dict(experiment_results)
 
-        multi_evaluation_run_logger.log(FINISHED_MULTI_DATASET_EVALUATION, {"model": model, "evaluation_datasets": evaluation_datasets, "evaluation_metrics": evaluation_metrics, "results": results, "batch_size": self.__batch_size})
-        multi_evaluation_run_logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
+        self.__logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
 
         return results

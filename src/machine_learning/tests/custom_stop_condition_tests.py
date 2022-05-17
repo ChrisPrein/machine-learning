@@ -13,14 +13,14 @@ class CustomStopConditionTestCase(unittest.TestCase):
     def setUp(self):
         fake = Faker()
 
-        self.training_context_patcher = patch('machine_learning.training.abstractions.stop_condition.TrainingContext', new=TrainingContext[Model[float, float]])
+        self.training_context_patcher = patch('machine_learning.training.abstractions.stop_condition.TrainingContext', new=TrainingContext[float, float, Model[float, float]])
 
-        self.training_context: TrainingContext[Model[float, float]] = self.training_context_patcher.start()
+        self.training_context: TrainingContext[float, float, Model[float, float]] = self.training_context_patcher.start()
 
     def tearDown(self):
         self.training_context_patcher.stop()
 
     def test_is_satisfied_should_return_true(self):
-        stop_condition: StopCondition[Model[float, float]] = CustomStopCondition[Model[float, float]](expression=lambda x: True)
+        stop_condition: StopCondition[TInput, TTarget, Model[float, float]] = CustomStopCondition[float, float, Model[float, float]](expression=lambda x: True)
 
         assert stop_condition.is_satisfied(self.training_context)

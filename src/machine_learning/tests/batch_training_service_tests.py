@@ -38,7 +38,7 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
 
         self.event_loop = asyncio.get_event_loop()
 
-        self.training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](event_loop=self.event_loop)
+        self.training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](train_hook=lambda w, x, y, z: x, event_loop=self.event_loop)
 
     def tearDown(self):
         pass

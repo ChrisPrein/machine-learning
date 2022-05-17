@@ -25,13 +25,6 @@ from .abstractions.machine_learning_experimentation_service import MachineLearni
 from .default_instance_factory import DefaultInstanceFactory
 from .default_dict_instance_factory import DefaultDictInstanceFactory
 
-START_RUN = 60
-END_RUN = 61
-START_EXPERIMENT = 62
-END_EXPERIMENT = 63
-START_EXPERIMENTS = 64
-END_EXPERIMENTS = 65
-
 EXPERIMENTATION_LOGGER_NAME = "experimentation"
 
 nest_asyncio.apply()
@@ -47,7 +40,7 @@ TrainingDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str
 EvaluationDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
 EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, EvaluationMetric[TInput, TTarget, TModel]]]
 ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]]
-StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TModel]]]
+StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TInput, TTarget, TModel]]]
 
 class DefaultMachineLearningExperimentationService(MachineLearningExperimentationService[TModel]):
     def __init__(self,
@@ -58,7 +51,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     test_dataset_factory: EvaluationDatasetFactoryAlias[TInput, TTarget],
     evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget, TModel],
     objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel],
-    stop_condition_factory: StopConditionFactoryAlias[TModel],
+    stop_condition_factory: StopConditionFactoryAlias[TInput, TTarget, TModel],
     event_loop: Optional[asyncio.AbstractEventLoop] = None,
     logger: Optional[Logger] = None, 
     process_pool: Optional[multiprocessing.ProcessPool] = None,
@@ -124,13 +117,12 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         with run_logger:
             try:
                 run_logger.info("executing run...")
-                run_logger.log(START_RUN, run_settings)
 
                 model: TModel = self.__model_factory(run_settings.model_settings)
 
                 training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
                 training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
-                stop_conditions: Dict[str, StopCondition[TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
+                stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
                 objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
                 model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
@@ -146,7 +138,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
                 run_logger.exception(msg=ex, exc_info=True, stack_info=True)
             finally:
                 run_logger.info("finished run.")
-                run_logger.log(END_RUN, result)
 
         return result
 
@@ -160,7 +151,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(experiment_settings.name, *combination) for combination in combinations]
 
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
-        experiment_logger.log(START_EXPERIMENT, {"experiment_settings": experiment_settings, "runs": runs})
 
         result: MachineLearningExperimentResult[TModel] = None
 
@@ -172,7 +162,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
             experiment_logger.critical(msg=ex, exc_info=True, stack_info=True)
         finally:
             experiment_logger.info(f"finished experiment {experiment_settings.name}.")
-            experiment_logger.log(END_EXPERIMENT, result)
 
         return result
 
@@ -183,7 +172,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
     async def run_experiments(self, experiment_settings: Dict[str, MachineLearningExperimentSettings]) -> Dict[str, MachineLearningExperimentResult[TModel]]:
         self.__logger.info(f"running {len(experiment_settings)} experiments...")
-        self.__logger.log(START_EXPERIMENTS, experiment_settings)
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, MachineLearningExperimentResult[TModel]]]] = [self.__run_experiment(settings) for settings in experiment_settings.items()]
 
@@ -192,6 +180,5 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         result:  Dict[str, MachineLearningExperimentResult[TModel]] = dict(results)
 
         self.__logger.info(f"finished all {len(experiment_settings)} experiments")
-        self.__logger.log(END_EXPERIMENTS, result)
 
         return result
