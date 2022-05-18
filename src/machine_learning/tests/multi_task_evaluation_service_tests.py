@@ -38,7 +38,7 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.event_loop = asyncio.get_event_loop()
 
-        self.evaluation_service: MultiTaskEvaluationService[str, str, Model[str, str]] = MultiTaskEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop, batch_size=None)
+        self.evaluation_service: MultiTaskEvaluationService[str, str, Model[str, str]] = MultiTaskEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop)
 
     def tearDown(self):
         pass

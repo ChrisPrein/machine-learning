@@ -19,13 +19,11 @@ from ..evaluation.abstractions.evaluation_metric import EvaluationMetric, Evalua
 from ..training.abstractions.stop_condition import StopCondition, TrainingContext
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from ..modeling.abstractions.model import TInput, TTarget
-from ..evaluation.abstractions.evaluation_service import EvaluationService
+from ..evaluation.abstractions.evaluation_service import EvaluationService, Score
 from ..training.abstractions.training_service import TrainingService
 from .abstractions.machine_learning_experimentation_service import MachineLearningExperimentationService, MachineLearningExperimentSettings, MachineLearningExperimentResult, MachineLearningRunResult, MachineLearningRunSettings, InstanceSettings
 from .default_instance_factory import DefaultInstanceFactory
 from .default_dict_instance_factory import DefaultDictInstanceFactory
-
-EXPERIMENTATION_LOGGER_NAME = "experimentation"
 
 nest_asyncio.apply()
 
@@ -57,11 +55,6 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     process_pool: Optional[multiprocessing.ProcessPool] = None,
     run_logger_factory: Optional[Callable[[str, UUID, MachineLearningRunSettings], Logger]] = None):
 
-        if logger is None:
-            self.__logger: Logger = logging.getLogger()
-        else:
-            self.__logger: Logger = logger.getChild(EXPERIMENTATION_LOGGER_NAME)
-
         if model_factory is None:
             raise ValueError("model_factory")
 
@@ -86,6 +79,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         if stop_condition_factory is None:
             raise ValueError("stop_condition_factory")
 
+        self.__logger = logger if not logger is None else logging.getLogger()
         self.__pool: multiprocessing.ProcessPool = process_pool if not process_pool is None else multiprocessing.ProcessPool(4)
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__run_logger_factory: Callable[[str, UUID, MachineLearningRunSettings], Logger] = run_logger_factory if not run_logger_factory is None else lambda experiment_name, uuid: logging.getLogger(str(uuid))
@@ -127,11 +121,15 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
                 model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
 
+                run_logger.log(model)
+
                 evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
                 evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
                 evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
                 
-                scores: Dict[str, Dict[str, float]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
+                scores: Dict[str, Dict[str, Score]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
+
+                run_logger.log(scores)
 
                 result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
             except Exception as ex:
