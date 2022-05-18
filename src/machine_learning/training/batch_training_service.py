@@ -98,8 +98,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if primary_objective is None:
             primary_objective = list(objective_functions.keys())[0]
 
-        training_context: TrainingContext[TInput, TTarget, TModel] = TrainingContext[TInput, TTarget, TModel](model=model, scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, current_epoch=0, current_iteration=0)
-
         current_dataset: Dataset[Tuple[TInput, TTarget]] = None
         dataset_name: str = None
 
@@ -109,6 +107,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         else:
             current_dataset = dataset
             dataset_name = type(dataset).__name__
+
+        training_context: TrainingContext[TInput, TTarget, TModel] = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=dataset_name, scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, current_epoch=0, current_iteration=0)
 
         training_size: int = int(len(current_dataset) * self.__training_dataset_size_ratio)
         validation_size: int = int(len(current_dataset) - training_size)
@@ -150,7 +150,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                     self.__post_train_hook(logger, training_context)
 
             logger.info("Evaluating current model.")
-            evaluation_scores: Dict[str, Score] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=objective_functions)
+            evaluation_scores: Dict[str, Score] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=(dataset_name, validation_dataset), evaluation_metrics=objective_functions)
             logger.info("finished evaluating current model.")
 
             for key, evaluation_score in evaluation_scores.items():
@@ -160,7 +160,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 logger.debug("Executing post epoch hook.")
                 self.__post_epoch_hook(logger, training_context, validation_dataset)
 
-            logger.info(training_context)
+            logger.info({'training_context': training_context})
 
         
         logger.info("Finished training loop.")
@@ -168,6 +168,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if not self.__post_loop_hook is None:
             logger.debug("Executing post loop hook.")
             self.__post_loop_hook(logger, training_context)
+
+        logger.info({'model': model})
 
         return model
 

@@ -108,34 +108,30 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         result: MachineLearningRunResult[TModel] = None
 
-        with run_logger:
-            try:
-                run_logger.info("executing run...")
+        try:
+            run_logger.info("executing run...")
 
-                model: TModel = self.__model_factory(run_settings.model_settings)
+            model: TModel = self.__model_factory(run_settings.model_settings)
 
-                training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
-                training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
-                stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
-                objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
+            training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
+            training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
+            stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
+            objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
 
-                model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
+            model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
 
-                run_logger.log(model)
+            evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
+            evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
+            evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
+            
+            scores: Dict[str, Dict[str, Score]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
 
-                evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
-                evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
-                evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
-                
-                scores: Dict[str, Dict[str, Score]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
-
-                run_logger.log(scores)
-
-                result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
-            except Exception as ex:
-                run_logger.exception(msg=ex, exc_info=True, stack_info=True)
-            finally:
-                run_logger.info("finished run.")
+            result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
+        except Exception as ex:
+            run_logger.exception(msg=ex, exc_info=True, stack_info=True)
+        finally:
+            run_logger.info("finished run.")
+            logging.shutdown(run_logger.handlers)
 
         return result
 

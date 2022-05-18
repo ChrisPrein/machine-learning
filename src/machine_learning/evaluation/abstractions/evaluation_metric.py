@@ -14,6 +14,7 @@ class Prediction(Generic[TInput, TTarget]):
 @dataclass(frozen=True)
 class EvaluationContext(Generic[TInput, TTarget, TModel], ABC):
     model: TModel
+    dataset_name: str
     predictions: List[Prediction[TInput, TTarget]]
 
 class EvaluationMetric(Generic[TInput, TTarget, TModel], ABC):

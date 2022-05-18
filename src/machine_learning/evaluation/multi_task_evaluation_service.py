@@ -19,7 +19,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, evaluation_hook: Callable[[Logger, TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, evaluation_hook: Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], TModel, List[TInput], List[TTarget]], List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         if evaluation_hook is None:
             raise ValueError("evaluation_hook")
         
@@ -27,12 +27,12 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
-        self.__evaluation_hook: Callable[[Logger, TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
+        self.__evaluation_hook: Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
 
-    def __predict_batch(self, model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
+    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TInput] = [sample[1] for sample in batch]
-        predictions: List[TTarget] = self.__evaluation_hook(self.__logger, model, inputs, targets)
+        predictions: List[TTarget] = self.__evaluation_hook(self.__logger, evaluation_context, model, inputs, targets)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
@@ -51,8 +51,6 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, [])
-
         dataset: Dataset[Tuple[TInput, TTarget]] = None
         dataset_name: str = None
 
@@ -63,11 +61,13 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset = evaluation_dataset
             dataset_name = type(dataset).__name__
 
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, [])
+
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
         logger.info('Starting evaluation loop...')
 
-        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: self.__predict_batch(model, batch)) for batch in data_loader]
+        prediction_futures: List[asyncio.Future] = [self.__event_loop.run_in_executor(None, lambda: self.__predict_batch(evaluation_context, model, batch)) for batch in data_loader]
         predictions: List[List[Prediction]] = await asyncio.gather(*prediction_futures, loop=self.__event_loop)
 
         for t in predictions:
@@ -81,7 +81,8 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             result[name] = Score[TInput, TTarget](value, evaluation_context.predictions, name, dataset_name)
 
         logger.info('Finished evaluation loop.')
-        logger.info(evaluation_context)
+        logger.info({'evaluation_context': evaluation_context})
+        logger.info({'scores': result})
 
         return result
 

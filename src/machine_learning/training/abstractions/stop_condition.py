@@ -13,6 +13,7 @@ TModel = TypeVar('TModel', bound=Model)
 @dataclass
 class TrainingContext(Generic[TInput, TTarget, TModel]):
     model: TModel
+    dataset_name: str
     current_epoch: int
     current_iteration: int
     scores: Dict[str, List[Score[TInput, TTarget]]]
