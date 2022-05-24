@@ -53,7 +53,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     event_loop: Optional[asyncio.AbstractEventLoop] = None,
     logger: Optional[Logger] = None, 
     process_pool: Optional[multiprocessing.ProcessPool] = None,
-    run_logger_factory: Optional[Callable[[str, UUID, MachineLearningRunSettings], Logger]] = None):
+    run_logger_factory: Optional[Callable[[str, UUID, UUID, MachineLearningRunSettings, bool], Logger]] = None,
+    experiment_logger_factory: Optional[Callable[[str, UUID, MachineLearningExperimentSettings, bool], Logger]] = None):
 
         if model_factory is None:
             raise ValueError("model_factory")
@@ -82,7 +83,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__logger = logger if not logger is None else logging.getLogger()
         self.__pool: multiprocessing.ProcessPool = process_pool if not process_pool is None else multiprocessing.ProcessPool(4)
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
-        self.__run_logger_factory: Callable[[str, UUID, MachineLearningRunSettings], Logger] = run_logger_factory if not run_logger_factory is None else lambda experiment_name, uuid: logging.getLogger(str(uuid))
+        self.__run_logger_factory: Callable[[str, UUID, UUID, MachineLearningRunSettings, bool], Logger] = run_logger_factory if not run_logger_factory is None else lambda experiment_name, experiment_id, run_id, settings, continue_run: logging.getLogger(str(run_id))
+        self.__experiment_logger_factory: Callable[[str, UUID, MachineLearningExperimentSettings, bool], Logger] = experiment_logger_factory if not experiment_logger_factory is None else lambda experiment_name, uuid: logging.getLogger(str(uuid))
         self.__model_factory: ModelFactoryAlias[TModel] = model_factory
         self.__training_service_factory: TrainingServiceFactoryAlias[TInput, TTarget, TModel] = training_service_factory
         self.__evaluation_service_factory: EvaluationServiceFactoryAlias[TInput, TTarget, TModel] = evaluation_service_factory
@@ -101,8 +103,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     def __setstate__(self, state):
         self.__dict__.update(state)
 
-    def __execute_run(self, run_settings: MachineLearningRunSettings) -> MachineLearningRunResult[TModel]:
-        run_id: UUID = uuid.uuid4()
+    def execute_run(self, run_settings: MachineLearningRunSettings, run_id: Optional[UUID] = None) -> MachineLearningRunResult[TModel]:
+        run_id: UUID = uuid.uuid4() if run_id is None else run_id
 
         run_logger: Logger = self.__run_logger_factory(run_settings.experiment_name, run_id, run_settings)
         event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
@@ -135,21 +137,22 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
         return result
 
-    async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings) -> MachineLearningExperimentResult[TModel]:
-        experiment_logger: Logger = self.__logger.getChild(experiment_settings.name)
+    async def run_experiment(self, experiment_settings: MachineLearningExperimentSettings, experiment_id: Optional[UUID] = None) -> MachineLearningExperimentResult[TModel]:
+        experiment_id: UUID = uuid.uuid4() if experiment_id is None else experiment_id
+        experiment_logger: Logger = self.__experiment_logger_factory(experiment_settings.name, experiment_id, experiment_settings, False)
 
         combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
         experiment_settings.evaluation_service_settings, experiment_settings.evaluation_dataset_settings, experiment_settings.training_dataset_settings,  
         experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
 
-        runs: List[MachineLearningRunSettings] = [MachineLearningRunSettings(experiment_settings.name, *combination) for combination in combinations]
+        runs: List[Tuple[MachineLearningRunSettings, UUID]] = [(MachineLearningRunSettings(experiment_settings.name, *combination), uuid.uuid4()) for combination in combinations]
 
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
 
         result: MachineLearningExperimentResult[TModel] = None
 
         try:
-            results: List[MachineLearningRunResult[TModel]] = self.__pool.map(self.__execute_run, runs)
+            results: List[MachineLearningRunResult[TModel]] = self.__pool.map(self.execute_run, runs)
 
             result = MachineLearningExperimentResult[TModel](results)
         except Exception as ex:

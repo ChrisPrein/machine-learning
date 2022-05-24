@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional, TypeVar, List, Generic, Dict, Tuple, Union
 from torch.utils.data.dataset import Dataset
+from dataclasses import dataclass
 
 from ...parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from ...modeling.abstractions.model import TInput, TTarget
-from .stop_condition import TModel, StopCondition
-
+from .stop_condition import TModel, StopCondition, TrainingContext
 
 class TrainingService(Generic[TInput, TTarget, TModel], ABC):
     
