@@ -51,6 +51,7 @@ class RunCheckpoint:
 @dataclass
 class ExperimentCheckpoint:
     id: UUID
+    name: str
     experiment_settings: MachineLearningExperimentSettings
     runs: Dict[UUID, MachineLearningRunSettings]
 
@@ -72,7 +73,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     save_run_checkpoint_hook: Optional[Callable[[Logger, RunCheckpoint], None]] = None,
     load_run_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[RunCheckpoint]]] = None,
     save_experiment_checkpoint_hook: Optional[Callable[[Logger, ExperimentCheckpoint], None]] = None,
-    load_experiment_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[ExperimentCheckpoint]]] = None):
+    load_experiment_checkpoint_hook: Optional[Callable[[Logger, str, UUID], Optional[ExperimentCheckpoint]]] = None):
 
         if model_factory is None:
             raise ValueError("model_factory")
@@ -116,7 +117,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__load_run_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[RunCheckpoint]]] = load_run_checkpoint_hook
 
         self.__save_experiment_checkpoint_hook: Optional[Callable[[Logger, ExperimentCheckpoint], None]] = save_experiment_checkpoint_hook
-        self.__load_experiment_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[ExperimentCheckpoint]]] = load_experiment_checkpoint_hook
+        self.__load_experiment_checkpoint_hook: Optional[Callable[[Logger, str, UUID], Optional[ExperimentCheckpoint]]] = load_experiment_checkpoint_hook
 
     def __getstate__(self):
         self_dict = self.__dict__.copy()
@@ -151,13 +152,13 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
             logger.info("experiment checkpoint created.")
 
-    def __load_experiment_checkpoint(self, logger: Logger, id: UUID) -> ExperimentCheckpoint:
+    def __load_experiment_checkpoint(self, logger: Logger, name: str, id: UUID) -> ExperimentCheckpoint:
         if self.__load_experiment_checkpoint_hook is None:
             return None
 
         logger.info("Loading last experiment checkpoint...")
 
-        return self.__load_experiment_checkpoint_hook(logger, id)
+        return self.__load_experiment_checkpoint_hook(logger, name, id)
 
     def execute_run(self, run_settings: MachineLearningRunSettings, run_id: Optional[UUID] = None) -> MachineLearningRunResult[TModel]:
         run_id: UUID = uuid.uuid4() if run_id is None else run_id
@@ -207,7 +208,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         experiment_id: UUID = uuid.uuid4() if experiment_id is None else experiment_id
         experiment_logger: Logger = self.__experiment_logger_factory(experiment_settings.name, experiment_id, experiment_settings, False)
 
-        checkpoint: ExperimentCheckpoint = self.__load_experiment_checkpoint(experiment_logger, experiment_id)
+        checkpoint: ExperimentCheckpoint = self.__load_experiment_checkpoint(experiment_logger, experiment_settings.name, experiment_id)
 
         runs: Dict[UUID, MachineLearningRunSettings] = None
 
@@ -221,7 +222,7 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
 
             runs = {uuid.uuid4(): MachineLearningRunSettings(experiment_settings.name, *combination) for combination in combinations}
 
-            new_checkpoint: ExperimentCheckpoint = ExperimentCheckpoint(experiment_id, experiment_settings, runs)
+            new_checkpoint: ExperimentCheckpoint = ExperimentCheckpoint(experiment_id, experiment_settings.name, experiment_settings, runs)
             self.__save_experiment_checkpoint(new_checkpoint)
 
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
