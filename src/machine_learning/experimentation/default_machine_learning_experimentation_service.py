@@ -5,6 +5,7 @@ import itertools
 from logging import Logger
 import logging
 from multiprocessing.dummy import Pool
+from optparse import Option
 from typing import Any, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, TypeVar, Union, final
 from uuid import UUID
 import uuid
@@ -13,6 +14,7 @@ from torch.utils.data import Dataset, random_split
 import nest_asyncio
 import dill
 import pathos.multiprocessing as multiprocessing
+from dataclasses import dataclass
 
 from .abstractions.instance_factory import InstanceFactory
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric, EvaluationContext, TModel
@@ -40,6 +42,18 @@ EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[st
 ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]]
 StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TInput, TTarget, TModel]]]
 
+@dataclass
+class RunCheckpoint:
+    id: UUID
+    run_settings: MachineLearningRunSettings
+    train_run_id: UUID
+
+@dataclass
+class ExperimentCheckpoint:
+    id: UUID
+    experiment_settings: MachineLearningExperimentSettings
+    runs: Dict[UUID, MachineLearningRunSettings]
+
 class DefaultMachineLearningExperimentationService(MachineLearningExperimentationService[TModel]):
     def __init__(self,
     model_factory: ModelFactoryAlias[TModel], 
@@ -54,7 +68,11 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     logger: Optional[Logger] = None, 
     process_pool: Optional[multiprocessing.ProcessPool] = None,
     run_logger_factory: Optional[Callable[[str, UUID, UUID, MachineLearningRunSettings, bool], Logger]] = None,
-    experiment_logger_factory: Optional[Callable[[str, UUID, MachineLearningExperimentSettings, bool], Logger]] = None):
+    experiment_logger_factory: Optional[Callable[[str, UUID, MachineLearningExperimentSettings, bool], Logger]] = None,
+    save_run_checkpoint_hook: Optional[Callable[[Logger, RunCheckpoint], None]] = None,
+    load_run_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[RunCheckpoint]]] = None,
+    save_experiment_checkpoint_hook: Optional[Callable[[Logger, ExperimentCheckpoint], None]] = None,
+    load_experiment_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[ExperimentCheckpoint]]] = None):
 
         if model_factory is None:
             raise ValueError("model_factory")
@@ -94,6 +112,12 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel] = objective_function_factory
         self.__stop_condition_factory: StopConditionFactoryAlias[TModel] = stop_condition_factory
 
+        self.__save_run_checkpoint_hook: Optional[Callable[[Logger, RunCheckpoint], None]] = save_run_checkpoint_hook
+        self.__load_run_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[RunCheckpoint]]] = load_run_checkpoint_hook
+
+        self.__save_experiment_checkpoint_hook: Optional[Callable[[Logger, ExperimentCheckpoint], None]] = save_experiment_checkpoint_hook
+        self.__load_experiment_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[ExperimentCheckpoint]]] = load_experiment_checkpoint_hook
+
     def __getstate__(self):
         self_dict = self.__dict__.copy()
         del self_dict['_DefaultMachineLearningExperimentationService__pool']
@@ -103,10 +127,55 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     def __setstate__(self, state):
         self.__dict__.update(state)
 
+    def __save_run_checkpoint(self, logger: Logger, checkpoint: RunCheckpoint):
+        if not self.__save_run_checkpoint_hook is None:
+            logger.info("creating run checkpoint...")
+
+            self.__save_run_checkpoint_hook(logger, checkpoint)
+
+            logger.info("run checkpoint created.")
+
+    def __load_run_checkpoint(self, logger: Logger, id: UUID) -> RunCheckpoint:
+        if self.__load_run_checkpoint_hook is None:
+            return None
+
+        logger.info("Loading last run checkpoint...")
+
+        return self.__load_run_checkpoint_hook(logger, id)
+
+    def __save_experiment_checkpoint(self, logger: Logger, checkpoint: ExperimentCheckpoint):
+        if not self.__save_experiment_checkpoint_hook is None:
+            logger.info("creating experiment checkpoint...")
+
+            self.__save_experiment_checkpoint_hook(logger, checkpoint)
+
+            logger.info("experiment checkpoint created.")
+
+    def __load_experiment_checkpoint(self, logger: Logger, id: UUID) -> ExperimentCheckpoint:
+        if self.__load_experiment_checkpoint_hook is None:
+            return None
+
+        logger.info("Loading last experiment checkpoint...")
+
+        return self.__load_experiment_checkpoint_hook(logger, id)
+
     def execute_run(self, run_settings: MachineLearningRunSettings, run_id: Optional[UUID] = None) -> MachineLearningRunResult[TModel]:
         run_id: UUID = uuid.uuid4() if run_id is None else run_id
-
         run_logger: Logger = self.__run_logger_factory(run_settings.experiment_name, run_id, run_settings)
+
+        checkpoint: RunCheckpoint = self.__load_run_checkpoint(run_logger, run_id)
+
+        train_run_id: UUID = None
+
+        if not checkpoint is None:
+            train_run_id = checkpoint.train_run_id
+            run_settings = checkpoint.run_settings
+        else:
+            train_run_id = uuid.uuid4()
+
+            new_checkpoint: RunCheckpoint = RunCheckpoint(run_id, run_settings, train_run_id)
+            self.__save_run_checkpoint(new_checkpoint)
+
         event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         result: MachineLearningRunResult[TModel] = None
 
@@ -114,18 +183,15 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
             run_logger.info("executing run...")
 
             model: TModel = self.__model_factory(run_settings.model_settings)
-
             training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
             training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
             stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
             objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
-
-            model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
-
             evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
             evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
             evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
             
+            model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions))
             scores: Dict[str, Dict[str, Score]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))
 
             result = MachineLearningRunResult[TModel](run_settings=run_settings, model=model, scores=scores)
@@ -141,18 +207,29 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         experiment_id: UUID = uuid.uuid4() if experiment_id is None else experiment_id
         experiment_logger: Logger = self.__experiment_logger_factory(experiment_settings.name, experiment_id, experiment_settings, False)
 
-        combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
-        experiment_settings.evaluation_service_settings, experiment_settings.evaluation_dataset_settings, experiment_settings.training_dataset_settings,  
-        experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
+        checkpoint: ExperimentCheckpoint = self.__load_experiment_checkpoint(experiment_logger, experiment_id)
 
-        runs: List[Tuple[MachineLearningRunSettings, UUID]] = [(MachineLearningRunSettings(experiment_settings.name, *combination), uuid.uuid4()) for combination in combinations]
+        runs: Dict[UUID, MachineLearningRunSettings] = None
+
+        if not checkpoint is None:
+            runs = checkpoint.runs
+            experiment_settings = checkpoint.experiment_settings
+        else:
+            combinations: List[Tuple] = itertools.product(experiment_settings.model_settings, experiment_settings.training_service_settings, 
+            experiment_settings.evaluation_service_settings, experiment_settings.evaluation_dataset_settings, experiment_settings.training_dataset_settings,  
+            experiment_settings.evaluation_metric_settings, experiment_settings.objective_function_settings, experiment_settings.stop_condition_settings)
+
+            runs = {uuid.uuid4(): MachineLearningRunSettings(experiment_settings.name, *combination) for combination in combinations}
+
+            new_checkpoint: ExperimentCheckpoint = ExperimentCheckpoint(experiment_id, experiment_settings, runs)
+            self.__save_experiment_checkpoint(new_checkpoint)
 
         experiment_logger.info(f"running experiment {experiment_settings.name}...")
 
         result: MachineLearningExperimentResult[TModel] = None
 
         try:
-            results: List[MachineLearningRunResult[TModel]] = self.__pool.map(self.execute_run, runs)
+            results: List[MachineLearningRunResult[TModel]] = self.__pool.map(self.execute_run, [(setting, run_id) for run_id, setting in runs.items()])
 
             result = MachineLearningExperimentResult[TModel](results)
         except Exception as ex:
