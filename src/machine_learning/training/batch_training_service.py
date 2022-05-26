@@ -184,7 +184,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             if not self.__post_epoch_hook is None:
                 logger.debug("Executing post epoch hook.")
-                self.__post_epoch_hook(logger, training_context[1], validation_dataset[1])
+                self.__post_epoch_hook(logger, training_context, validation_dataset[1])
 
             logger.info({'training_context': training_context})
 
