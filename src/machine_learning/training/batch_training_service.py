@@ -277,7 +277,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] = checkpoint.stop_conditions
         objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = checkpoint.objective_functions
         primary_objective: str = checkpoint.primary_objective
-        id: UUID = TrainingCheckpoint.id
+        id: UUID = checkpoint.id
 
         logger.info("Continuing training loop from last checkpoint...")
 
