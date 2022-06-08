@@ -12,6 +12,8 @@ from dataset_handling.dataloader import DataLoader
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
 from dataclasses import dataclass
+from tqdm import tqdm
+import time
 
 from ..evaluation.default_evaluation import default_evaluation
 from ..evaluation.abstractions.evaluation_service import EvaluationService
@@ -25,21 +27,14 @@ from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationServic
 nest_asyncio.apply()
 
 @dataclass
-class TrainingCheckpoint(Generic[TInput, TTarget, TModel]):
+class TrainingCheckpoint():
     id: UUID
-    training_context: TrainingContext[TInput, TTarget, TModel]
-    stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]]
-    objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]
-    primary_objective: str
+    current_epoch: int
 
 @dataclass
-class MultiDatasetTrainingCheckpoint(Generic[TInput, TTarget, TModel]):
+class MultiDatasetTrainingCheckpoint():
     id: UUID
-    model: TModel
     train_runs: Dict[UUID, str]
-    stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]]
-    objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]
-    primary_objective: str
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, train_hook: Callable[[Logger, TrainingContext[TInput, TTarget, TModel], List[TInput], List[TTarget]], None], 
@@ -49,9 +44,9 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, pre_loop_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None,
     post_loop_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None, pre_epoch_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None, 
     post_epoch_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel], Dataset[Tuple[TInput, TTarget]]], None]] = None, pre_train_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None,
-    post_train_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None, save_checkpoint_hook: Optional[Callable[[Logger, TrainingCheckpoint[TInput, TTarget, TModel]], None]] = None,
-    load_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[TrainingCheckpoint[TInput, TTarget, TModel]]]] = None, save_model_hook: Optional[Callable[[Logger, UUID, TModel], None]] = None,
-    save_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel]], None]] = None, load_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel]]]] = None):
+    post_train_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = None, save_checkpoint_hook: Optional[Callable[[Logger, TrainingCheckpoint], None]] = None,
+    load_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[TrainingCheckpoint]]] = None, save_model_hook: Optional[Callable[[Logger, UUID, TModel], None]] = None,
+    save_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, MultiDatasetTrainingCheckpoint], None]] = None, load_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[MultiDatasetTrainingCheckpoint]]] = None):
         
         if train_hook is None:
             raise ValueError("train_hook")
@@ -77,11 +72,11 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__pre_train_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = pre_train_hook
         self.__post_train_hook: Optional[Callable[[Logger, TrainingContext[TInput, TTarget, TModel]], None]] = post_train_hook
 
-        self.__save_checkpoint_hook: Optional[Callable[[Logger, TrainingCheckpoint[TInput, TTarget, TModel]], None]] = save_checkpoint_hook
-        self.__load_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[TrainingCheckpoint[TInput, TTarget, TModel]]]] = load_checkpoint_hook
+        self.__save_checkpoint_hook: Optional[Callable[[Logger, TrainingCheckpoint], None]] = save_checkpoint_hook
+        self.__load_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[TrainingCheckpoint]]] = load_checkpoint_hook
 
-        self.__save_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel]], None]] = save_multi_dataset_checkpoint_hook
-        self.__load_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel]]]] = load_multi_dataset_checkpoint_hook
+        self.__save_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, MultiDatasetTrainingCheckpoint], None]] = save_multi_dataset_checkpoint_hook
+        self.__load_multi_dataset_checkpoint_hook: Optional[Callable[[Logger, UUID], Optional[MultiDatasetTrainingCheckpoint]]] = load_multi_dataset_checkpoint_hook
 
         self.__save_model_hook: Optional[Callable[[Logger, UUID, TModel], None]] = save_model_hook
 
@@ -152,13 +147,35 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         training_data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=training_dataset[1], batch_size=self.__batch_size, drop_last=self.__drop_last)
         
         while not self.__is_any_stop_condition_satisfied(training_context=training_context, stop_conditions=stop_conditions):
+            logger.info("Starting epoch...")
+            epoch_start_time: float = time.time()
             training_context.current_epoch += 1
 
             if not self.__pre_epoch_hook is None:
                 logger.debug("Executing pre epoch hook.")
                 self.__pre_train_hook(logger, training_context)
 
-            for batch_index, batch in enumerate(training_data_loader):
+            sum_iteration_run_time: float = 0
+            count_iteration_run_times: int = 0
+
+            sum_batch_load_time: float = 0
+            count_batch_load_times: int = 0
+
+            iteration_start_time: float = 0
+            iteration_end_time: float = 0
+            batch_load_start_time: float = 0
+
+            batch_load_start_time = time.time()
+
+            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100)):
+
+                iteration_start_time = time.time()
+
+                sum_batch_load_time += iteration_start_time - batch_load_start_time
+                count_batch_load_times += 1
+
+                logger.debug(f"Batch load took {iteration_start_time - batch_load_start_time} seconds.")
+
                 training_context.current_iteration += 1
 
                 if not self.__pre_train_hook is None:
@@ -175,6 +192,17 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                     logger.debug("Executing post training hook.")
                     self.__post_train_hook(logger, training_context)
 
+                iteration_end_time = time.time()
+                sum_iteration_run_time += iteration_end_time - iteration_start_time
+                count_iteration_run_times += 1
+
+                logger.debug(f"Iteration took {iteration_end_time - iteration_start_time} seconds.")
+
+                batch_load_start_time = time.time()
+
+            logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
+            logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
+
             logger.info("Evaluating current model.")
             evaluation_scores: Dict[str, Score] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=objective_functions)
             logger.info("finished evaluating current model.")
@@ -185,15 +213,16 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             if not self.__post_epoch_hook is None:
                 logger.debug("Executing post epoch hook.")
                 self.__post_epoch_hook(logger, training_context, validation_dataset[1])
-
-            logger.info({'training_context': training_context})
-
             self.__save_model(logger, id, training_context.model)
 
-            new_checkpoint: TrainingCheckpoint[TInput, TTarget, TModel] = TrainingCheckpoint[TInput, TTarget, TModel](id=id, training_context=training_context, stop_conditions=stop_conditions, objective_functions=objective_functions, primary_objective=primary_objective)
+            new_checkpoint: TrainingCheckpoint = TrainingCheckpoint(id=id, current_epoch=training_context.current_epoch)
             self.__save_checkpoint(logger, new_checkpoint)
 
+            logger.info("Finished epoch.")
+            logger.info(f"Epoch took {time.time() - epoch_start_time} seconds.")
+
         logger.info("Finished training loop.")
+
 
         if not self.__post_loop_hook is None:
             logger.debug("Executing post loop hook.")
@@ -220,7 +249,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if primary_objective is None:
             primary_objective = list(objective_functions.keys())[0]
 
-        checkpoint: Optional[TrainingCheckpoint[TInput, TTarget, TModel]] = self.__load_checkpoint(logger, id)
+        checkpoint: Optional[TrainingCheckpoint] = self.__load_checkpoint(logger, id)
 
         current_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]] = None
         training_context: TrainingContext[TInput, TTarget, TModel] = None
@@ -245,7 +274,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             training_dataset = current_dataset
 
         if not checkpoint is None:
-            return await self.continue_training(checkpoint, training_dataset, validation_dataset, logger)
+            return await self.continue_training(model, stop_conditions, objective_functions, primary_objective, checkpoint, training_dataset, validation_dataset, logger)
 
         logger.info('Starting training loop...')
 
@@ -253,12 +282,12 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             logger.debug("Executing pre loop hook.")
             self.__pre_loop_hook(logger, training_context)
 
-        new_checkpoint: TrainingCheckpoint[TInput, TTarget, TModel] = TrainingCheckpoint[TInput, TTarget, TModel](id=id, training_context=training_context, stop_conditions=stop_conditions, objective_functions=objective_functions, primary_objective=primary_objective)
+        new_checkpoint: TrainingCheckpoint = TrainingCheckpoint(id=id, current_epoch=training_context.current_epoch)
         self.__save_checkpoint(logger, new_checkpoint)
 
         return await self.__execute_train_loop(id, model, training_context, stop_conditions, objective_functions, primary_objective, logger, training_dataset, validation_dataset)
 
-    async def continue_training(self, id_or_checkpoint: Union[UUID, TrainingCheckpoint], training_dataset: Tuple[Dataset[Tuple[TInput, TTarget]]], validation_dataset: Tuple[Dataset[Tuple[TInput, TTarget]]], logger: Optional[Logger] = None) -> TModel:
+    async def continue_training(self, model: TModel, stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: str, id_or_checkpoint: Union[UUID, TrainingCheckpoint], training_dataset: Tuple[Dataset[Tuple[TInput, TTarget]]], validation_dataset: Tuple[Dataset[Tuple[TInput, TTarget]]], logger: Optional[Logger] = None) -> TModel:
         if logger is None:
             logger = self.__logger
 
@@ -272,11 +301,11 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if checkpoint is None:
             raise ValueError("checkpoint")
 
-        model: TModel = checkpoint.training_context.model
-        training_context: TrainingContext[TInput, TTarget, TModel] = checkpoint.training_context
-        stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] = checkpoint.stop_conditions
-        objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = checkpoint.objective_functions
-        primary_objective: str = checkpoint.primary_objective
+        model: TModel = model
+        training_context: TrainingContext[TInput, TTarget, TModel] = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=training_dataset[0], scores={objective: [] for objective in objective_functions.keys()}, _primary_objective=primary_objective, current_epoch=checkpoint.current_epoch, current_iteration=0)
+        stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] = stop_conditions
+        objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = objective_functions
+        primary_objective: str = primary_objective
         id: UUID = checkpoint.id
 
         logger.info("Continuing training loop from last checkpoint...")
@@ -296,21 +325,21 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         id = id if not id is None else uuid.uuid4()
 
-        checkpoint: Optional[MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel]] = self.__load_multi_dataset_checkpoint(self.__logger, id)
+        checkpoint: Optional[MultiDatasetTrainingCheckpoint] = self.__load_multi_dataset_checkpoint(self.__logger, id)
 
         if not checkpoint is None:
-            return await self.continue_multi_dataset_training(checkpoint, datasets, validation_dataset)
+            return await self.continue_multi_dataset_training(model, stop_conditions, objective_functions, primary_objective, checkpoint, datasets, validation_dataset)
 
         self.__logger.info(f"starting training on {len(datasets)} datasets...")
 
         train_runs: Dict[UUID, Tuple[str, Dataset[Tuple[TInput, TTarget]]]] = {uuid.uuid4(): dataset for dataset in datasets.items()}
 
-        new_checkpoint: MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel] = MultiDatasetTrainingCheckpoint[TInput, TTarget, TModel](id, model, {train_run_id: dataset[0] for train_run_id, dataset in train_runs.items()}, stop_conditions, objective_functions, primary_objective)
+        new_checkpoint: MultiDatasetTrainingCheckpoint = MultiDatasetTrainingCheckpoint(id, {train_run_id: dataset[0] for train_run_id, dataset in train_runs.items()})
         self.__save_multi_dataset_checkpoint(self.__logger, new_checkpoint)
 
         return await self.__execute_multi_train_loop(model, train_runs, stop_conditions, objective_functions, primary_objective, validation_dataset)
 
-    async def continue_multi_dataset_training(self, id_or_checkpoint: Union[UUID, MultiDatasetTrainingCheckpoint], datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]]) -> TModel:
+    async def continue_multi_dataset_training(self, model: TModel, stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: str, id_or_checkpoint: Union[UUID, MultiDatasetTrainingCheckpoint], datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]]) -> TModel:
         checkpoint: MultiDatasetTrainingCheckpoint = None
 
         if isinstance(id_or_checkpoint, UUID):
@@ -321,11 +350,11 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if checkpoint is None:
             raise ValueError("checkpoint")
 
-        model: TModel = checkpoint.model
+        model: TModel = model
         train_runs: Dict[UUID, Tuple[str, Dataset[Tuple[TInput, TTarget]]]] = {train_run_id: datasets[dataset_name] for train_run_id, dataset_name in checkpoint.train_runs.items()}
-        stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] = checkpoint.stop_conditions
-        objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = checkpoint.objective_functions
-        primary_objective: str = checkpoint.primary_objective
+        stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] = stop_conditions
+        objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = objective_functions
+        primary_objective: str = primary_objective
 
         self.__logger.info("Continuing training loop from last checkpoint...")
 
