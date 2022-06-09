@@ -22,12 +22,15 @@ nest_asyncio.apply()
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     def __init__(self, pre_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel]], None]] = None,
+    pre_multi_loop_hook: Optional[Callable[[Logger], None]] = None, post_multi_loop_hook: Optional[Callable[[Logger], None]] = None,
     post_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], Dict[str, Score]], None]] = None, evaluation_hook: Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], TModel, List[TInput], List[TTarget]], 
     List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
         if evaluation_hook is None:
             raise ValueError("evaluation_hook")
         
         self.__logger = logger if not logger is None else logging.getLogger()
+        self.__pre_multi_loop_hook: Optional[Callable[[Logger], None]] = pre_multi_loop_hook
+        self.__post_multi_loop_hook: Optional[Callable[[Logger], None]] = post_multi_loop_hook
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
@@ -137,6 +140,10 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
     async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, Score]]:
         self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
+
+        if not self.__pre_multi_loop_hook is None:
+            self.__logger.debug("Executing pre loop hook.")
+            self.__pre_multi_loop_hook(self.__logger)
         
         experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, Score]]]] = [self.__evaluate(model, dataset, evaluation_metrics, self.__logger.getChild(str(dataset[0]))) for dataset in evaluation_datasets.items()]
 
@@ -145,5 +152,9 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         results = dict(experiment_results)
 
         self.__logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
+
+        if not self.__post_multi_loop_hook is None:
+            self.__logger.debug("Executing post loop hook.")
+            self.__post_multi_loop_hook(self.__logger)
 
         return results
