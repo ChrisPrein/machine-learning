@@ -7,9 +7,8 @@ from torch.utils.data.dataset import Dataset
 from multipledispatch import dispatch
 
 @dataclass(frozen=True)
-class Score(Generic[TInput, TTarget]):
+class Score():
     value: float
-    predictions: List[Prediction[TInput, TTarget]]
     metric_name: str
     dataset_name: str
 

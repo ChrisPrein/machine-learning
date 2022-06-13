@@ -78,11 +78,9 @@ class MultiTaskEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
             value: float = evaluation_metric.calculate_score(context=evaluation_context)
 
-            result[name] = Score[TInput, TTarget](value, evaluation_context.predictions, name, dataset_name)
+            result[name] = Score(value, name, dataset_name)
 
         logger.info('Finished evaluation loop.')
-        logger.info({'evaluation_context': evaluation_context})
-        logger.info({'scores': result})
 
         return result
 

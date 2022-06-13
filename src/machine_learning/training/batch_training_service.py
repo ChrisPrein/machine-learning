@@ -23,6 +23,7 @@ from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
 from ..evaluation.abstractions.evaluation_metric import EvaluationContext, TModel
 from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
+from ..evaluation.default_evaluation_service import DefaultEvaluationService
 
 nest_asyncio.apply()
 
@@ -55,7 +56,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__logger = logger if not logger is None else logging.getLogger()
         
         if evaluation_service is None:
-            evaluation_service = MultiTaskEvaluationService[TInput, TTarget, TModel](logger=self.__logger, batch_size=batch_size, drop_last=drop_last, event_loop=event_loop, evaluation_hook=evaluation_hook)
+            evaluation_service = DefaultEvaluationService[TInput, TTarget, TModel](logger=self.__logger, batch_size=batch_size, drop_last=drop_last, event_loop=event_loop, evaluation_hook=evaluation_hook)
         
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__max_epochs: int = max_epochs
