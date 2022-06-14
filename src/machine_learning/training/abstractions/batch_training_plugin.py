@@ -6,15 +6,15 @@ from torch.utils.data import Dataset, random_split
 
 from ...evaluation.abstractions.evaluation_service import Score
 
-from .stop_condition import TModel, StopCondition
 from ...modeling.abstractions.model import Model, TInput, TTarget
+from ...evaluation.contexts.evaluation_context import *
 
 @dataclass
 class TrainingContext(Generic[TInput, TTarget, TModel]):
     model: TModel
     dataset_name: str
     current_epoch: int
-    current_iteration: int
+    current_batch_index: int
     scores: Dict[str, Deque[Score]]
     train_losses: Deque[float]
     _primary_objective: str

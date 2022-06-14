@@ -1,11 +1,11 @@
 from logging import Logger
 import logging
-from typing import Any, Callable, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
-from uuid import UUID
-import uuid
+from typing import List, Optional, Dict, Tuple, Union
 import time
 
 from attr import asdict
+
+from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService, Score
@@ -21,27 +21,74 @@ import nest_asyncio
 nest_asyncio.apply()
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, pre_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel]], None]] = None,
-    pre_multi_loop_hook: Optional[Callable[[Logger], None]] = None, post_multi_loop_hook: Optional[Callable[[Logger], None]] = None,
-    post_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], Dict[str, Score]], None]] = None, evaluation_hook: Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], TModel, List[TInput], List[TTarget]], 
-    List[TTarget]] = default_evaluation, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None):
-        if evaluation_hook is None:
-            raise ValueError("evaluation_hook")
-        
+    def __init__(self, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, 
+    event_loop: Optional[asyncio.AbstractEventLoop] = None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}):
         self.__logger = logger if not logger is None else logging.getLogger()
-        self.__pre_multi_loop_hook: Optional[Callable[[Logger], None]] = pre_multi_loop_hook
-        self.__post_multi_loop_hook: Optional[Callable[[Logger], None]] = post_multi_loop_hook
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
-        self.__pre_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel]], None]] = pre_loop_hook
-        self.__post_loop_hook: Optional[Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], Dict[str, Score]], None]] = post_loop_hook
-        self.__evaluation_hook: Callable[[Logger, EvaluationContext[TInput, TTarget, TModel], TModel, List[TInput], List[TTarget]], List[TTarget]] = evaluation_hook
+
+        self.__pre_multi_loop_plugins: Dict[str, PreMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiLoop), plugins.items()))
+        self.__post_multi_loop_plugins: Dict[str, PostMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiLoop), plugins.items()))
+        self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
+        self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
+        self.__pre_evaluation_step_plugins: Dict[str, PreEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreEvaluationStep), plugins.items()))
+        self.__post_evaluation_step_plugins: Dict[str, PostEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostEvaluationStep), plugins.items()))
+        self.__pre_multi_evaluation_step_plugins: Dict[str, PreMultiEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiEvaluationStep), plugins.items()))
+        self.__post_multi_evaluation_step_plugins: Dict[str, PostMultiEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiEvaluationStep), plugins.items()))
+
+    def __execute_pre_multi_loop_plugins(self, logger: Logger, context: MultiEvaluationContext):
+        logger.debug("Executing pre multi loop plugins...")
+        for name, plugin in self.__pre_multi_loop_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.pre_multi_loop(logger, context)
+
+    def __execute_post_multi_loop_plugins(self, logger: Logger, context: MultiEvaluationContext):
+        logger.debug("Executing post multi loop plugins...")
+        for name, plugin in self.__post_multi_loop_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.post_multi_loop(logger, context)
+
+    def __execute_pre_multi_evaluation_step_plugins(self, logger: Logger, context: MultiEvaluationContext):
+        logger.debug("Executing pre multi train step plugins...")
+        for name, plugin in self.__pre_multi_evaluation_step_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.pre_multi_evaluation_step(logger, context)
+
+    def __execute_post_multi_evaluation_step_plugins(self, logger: Logger, context: MultiEvaluationContext):
+        logger.debug("Executing post multi train step plugins...")
+        for name, plugin in self.__post_multi_evaluation_step_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.post_multi_evaluation_step(logger, context)
+
+    def __execute_pre_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+        logger.debug("Executing pre loop plugins...")
+        for name, plugin in self.__pre_loop_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.pre_loop(logger, context)
+
+    def __execute_post_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel], result: Dict[str, Score]):
+        logger.debug("Executing post loop plugins...")
+        for name, plugin in self.__post_loop_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.post_loop(logger, context, result)
+
+    def __execute_pre_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+        logger.debug("Executing pre train plugins...")
+        for name, plugin in self.__pre_evaluation_step_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.pre_evaluation_step(logger, context)
+
+    def __execute_post_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+        logger.debug("Executing post train plugins...")
+        for name, plugin in self.__post_evaluation_step_plugins.items():
+            logger.debug(f"Executing plugin with name {name}...")
+            plugin.post_evaluation_step(logger, context)
 
     def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TInput] = [sample[1] for sample in batch]
-        predictions: List[TTarget] = self.__evaluation_hook(self.__logger, evaluation_context, model, inputs, targets)
+        predictions: List[TTarget] = model.predict_step(inputs)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
@@ -70,16 +117,14 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset = evaluation_dataset
             dataset_name = type(dataset).__name__
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, [])
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, [], 0)
 
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
         logger.info('Starting evaluation loop...')
         evaluation_start_time: float = time.time()
 
-        if not self.__pre_loop_hook is None:
-            logger.debug("Executing pre loop hook.")
-            self.__pre_loop_hook(logger, evaluation_context)
+        self.__execute_pre_loop_plugins(logger, evaluation_context)
 
         sum_iteration_run_time: float = 0
         count_iteration_run_times: int = 0
@@ -93,18 +138,23 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         batch_load_start_time = time.time()
 
-        for batch_index, batch in enumerate(tqdm(data_loader, miniters=len(dataset)/100)):
-            
+        for batch_index, batch in enumerate(tqdm(data_loader, miniters=len(dataset)/100)[evaluation_context.current_batch_index:]):
+            evaluation_context.current_batch_index = batch_index
+
             iteration_start_time = time.time()
 
             sum_batch_load_time += iteration_start_time - batch_load_start_time
             count_batch_load_times += 1
 
             logger.debug(f"Batch load took {iteration_start_time - batch_load_start_time} seconds.")
+
+            self.__execute_pre_evaluation_step_plugins(logger, evaluation_context)
             
             predictions: List[Prediction] = self.__predict_batch(evaluation_context, model, batch)
 
             evaluation_context.predictions.extend(predictions)
+
+            self.__execute_post_evaluation_step_plugins(logger, evaluation_context)
 
             iteration_end_time = time.time()
             sum_iteration_run_time += iteration_end_time - iteration_start_time
@@ -127,9 +177,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.info('Finished evaluation loop.')
         logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")
 
-        if not self.__post_loop_hook is None:
-            logger.debug("Executing post loop hook.")
-            self.__post_loop_hook(logger, evaluation_context, result)
+        self.__execute_post_loop_plugins(logger, evaluation_context, result)
         
         return result
 
@@ -141,20 +189,24 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, Score]]:
         self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
 
-        if not self.__pre_multi_loop_hook is None:
-            self.__logger.debug("Executing pre loop hook.")
-            self.__pre_multi_loop_hook(self.__logger)
-        
-        experiment_tasks: List[Coroutine[Any, Any, Tuple[str, Dict[str, Score]]]] = [self.__evaluate(model, dataset, evaluation_metrics, self.__logger.getChild(str(dataset[0]))) for dataset in evaluation_datasets.items()]
+        context: MultiEvaluationContext = MultiEvaluationContext(current_dataset_index=0, scores={})
 
-        experiment_results: List[Tuple[str, Dict[str, Score]]] = await asyncio.gather(*experiment_tasks, loop=self.__event_loop)
+        self.__execute_pre_multi_loop_plugins(self.__logger, context)
 
-        results = dict(experiment_results)
+        for dataset_index in range(context.current_dataset_index, evaluation_datasets.items()):
+            context.current_dataset_index = dataset_index
+
+            self.__execute_pre_multi_evaluation_step_plugins(self.__logger, context)
+
+            dataset_name, dataset = evaluation_datasets.items()[0]
+
+            evaluation_logger: Logger = self.__logger.getChild(dataset_name)
+            context.scores[dataset_name] = self.evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
+
+            self.__execute_post_multi_evaluation_step_plugins(self.__logger, context)
 
         self.__logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
 
-        if not self.__post_multi_loop_hook is None:
-            self.__logger.debug("Executing post loop hook.")
-            self.__post_multi_loop_hook(self.__logger)
+        self.__execute_post_multi_loop_plugins(self.__logger, context)
 
-        return results
+        return context.scores

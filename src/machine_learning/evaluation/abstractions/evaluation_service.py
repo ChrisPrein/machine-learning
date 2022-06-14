@@ -2,15 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeVar, List, Generic, Dict, Tuple, Union
 from ...modeling.abstractions.model import Model, TInput, TTarget
-from .evaluation_metric import Prediction, TModel, EvaluationMetric
+from .evaluation_metric import EvaluationMetric
 from torch.utils.data.dataset import Dataset
 from multipledispatch import dispatch
 
-@dataclass(frozen=True)
-class Score():
-    value: float
-    metric_name: str
-    dataset_name: str
+from .default_evaluation_plugin import *
 
 class EvaluationService(Generic[TInput, TTarget, TModel], ABC):
     

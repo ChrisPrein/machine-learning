@@ -2,18 +2,13 @@ from abc import ABC
 from collections import deque
 from logging import Logger
 import logging
-from pathlib import Path
-from typing import Any, Callable, Coroutine, TypeVar, List, Generic, Optional, Dict, Tuple, Union
+from typing import List, Optional, Dict, Tuple, Union
 import asyncio
 import asyncio.tasks
 import asyncio.futures
-from uuid import UUID
-import uuid
 from dataset_handling.dataloader import DataLoader
-from pyrsistent import T
 from torch.utils.data import Dataset, random_split
 import nest_asyncio
-from dataclasses import dataclass
 from tqdm import tqdm
 import time
 
@@ -25,7 +20,7 @@ from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
-from ..evaluation.abstractions.evaluation_metric import EvaluationContext, TModel
+from ..evaluation.abstractions.evaluation_metric import EvaluationContext
 from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..evaluation.default_evaluation_service import DefaultEvaluationService
 
@@ -134,7 +129,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         if training_context.current_epoch > self.__max_epochs: 
             self.__logger.info("Max number of epochs reached.")
             is_any_satisfied = True
-        elif training_context.current_iteration > self.__max_iterations:
+        elif training_context.current_batch_index > self.__max_iterations:
             self.__logger.info("Max number of iterations reached.")
         else:
             for key, condition in stop_conditions.items():
@@ -147,7 +142,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__logger.info("Finished checking stop conditions.")
         return is_any_satisfied
 
-    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None, logger: Optional[Logger] = None, id: Optional[UUID] = None) -> TModel:
+    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None, logger: Optional[Logger] = None) -> TModel:
         logger = logger if not logger is None else self.__logger
         
         if model is None:
@@ -174,7 +169,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         else:
             current_dataset = (type(dataset).__name__, dataset)
 
-        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=current_dataset[0], scores={objective: deque([], self.__max_scores) for objective in objective_functions.keys()}, train_losses=deque([], self.__max_losses), _primary_objective=primary_objective, current_epoch=0, current_iteration=0)
+        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=current_dataset[0], scores={objective: deque([], self.__max_scores) for objective in objective_functions.keys()}, train_losses=deque([], self.__max_losses), _primary_objective=primary_objective, current_epoch=0, current_batch_index=0)
 
         training_size: int = int(len(current_dataset[1]) * self.__training_dataset_size_ratio)
         validation_size: int = int(len(current_dataset[1]) - training_size)
@@ -212,7 +207,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             batch_load_start_time = time.time()
 
-            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100)):
+            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100)[training_context.current_batch_index:]):
+                training_context.current_batch_index = batch_index
 
                 iteration_start_time = time.time()
 
@@ -220,8 +216,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 count_batch_load_times += 1
 
                 logger.debug(f"Batch load took {iteration_start_time - batch_load_start_time} seconds.")
-
-                training_context.current_iteration += 1
 
                 self.__execute_pre_train_plugins(logger, training_context)
 
@@ -271,7 +265,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         self.__execute_pre_multi_loop_plugins(self.__logger, context)
 
-        for dataset_index in range(context.current_dataset_index, datasets.items()):
+        for dataset_index in range(context.current_dataset_index, len(datasets.items())):
             context.current_dataset_index = dataset_index
 
             self.__execute_pre_multi_train_step_plugins(self.__logger, context)
@@ -279,7 +273,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             dataset_name, dataset = datasets.items()[0]
 
             training_run_logger: Logger = self.__logger.getChild(dataset_name)
-            model = await self.train(model, dataset, stop_conditions, objective_functions, primary_objective, validation_dataset, training_run_logger)
+            model = await self.train(model, (dataset_name, dataset), stop_conditions, objective_functions, primary_objective, validation_dataset, training_run_logger)
 
             self.__execute_post_multi_train_step_plugins(self.__logger, context)
 
