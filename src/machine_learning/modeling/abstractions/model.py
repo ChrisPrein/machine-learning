@@ -11,7 +11,7 @@ class Model(Generic[TInput, TTarget], ABC):
         pass
 
     @abstractmethod
-    def training_step(self, batch: List[TInput]) -> float:
+    def training_step(self, input_batch: List[TInput], target_batch: List[TTarget]) -> float:
         pass
 
     __call__ : Callable[..., Any] = predict_step
