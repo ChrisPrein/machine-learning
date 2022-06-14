@@ -7,11 +7,11 @@ TTarget = TypeVar('TTarget')
 class Model(Generic[TInput, TTarget], ABC):
 
     @abstractmethod
-    def predict(self, input: TInput) -> TTarget:
+    def predict_step(self, batch: List[TInput]) -> List[TTarget]: 
         pass
 
     @abstractmethod
-    def predict_batch(self, input_batch: List[TInput]) -> List[TTarget]:
+    def training_step(self, batch: List[TInput]) -> float:
         pass
 
-    __call__ : Callable[..., Any] = predict
+    __call__ : Callable[..., Any] = predict_step
