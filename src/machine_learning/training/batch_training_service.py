@@ -14,7 +14,6 @@ import time
 
 from machine_learning.training.abstractions.batch_training_plugin import BatchTrainingPlugin, PostEpoch, PostLoop, PostMultiLoop, PostTrain, PreEpoch, PreLoop, PreMultiLoop, PreTrain
 
-from ..evaluation.default_evaluation import default_evaluation
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from .abstractions.stop_condition import StopCondition, TrainingContext, Score
