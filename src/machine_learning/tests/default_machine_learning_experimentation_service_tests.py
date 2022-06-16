@@ -11,7 +11,6 @@ from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..training.abstractions.training_service import TrainingService
 from ..modeling.abstractions.model import Model, TInput, TTarget
@@ -30,13 +29,13 @@ class DefaultMachineLearningExperimentationTestCase(unittest.TestCase):
         self.model: Model[str, str] = AsyncMock(spec=Model)
         self.model.__class__ = AsyncMock
 
-        self.objective_function: ObjectiveFunction[str, str, Model[str, str]] = AsyncMock(spec=ObjectiveFunction)
+        self.objective_function: ObjectiveFunction[str, str] = AsyncMock(spec=ObjectiveFunction)
         self.objective_function.__class__ = AsyncMock
 
         self.stop_condition: StopCondition[str, str, Model[str, str]] = AsyncMock(spec=StopCondition)
         self.stop_condition.__class__ = AsyncMock
 
-        self.evaluation_metric: EvaluationMetric[str, str, Model[str, str]] = AsyncMock(spec=EvaluationMetric)
+        self.evaluation_metric: EvaluationMetric[str, str] = AsyncMock(spec=EvaluationMetric)
         self.stop_condition.__class__ = AsyncMock
 
         self.evaluation_service: EvaluationService[str, str, Model[str, str]] = AsyncMock(spec=EvaluationService)

@@ -38,8 +38,8 @@ TrainingServiceFactoryAlias = FactoryAlias[InstanceSettings, TrainingService[TIn
 EvaluationServiceFactoryAlias = FactoryAlias[InstanceSettings, EvaluationService[TInput, TTarget, TModel]]
 TrainingDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
 EvaluationDatasetFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, Dataset[Tuple[TInput, TTarget]]]]
-EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, EvaluationMetric[TInput, TTarget, TModel]]]
-ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget, TModel]]]
+EvaluationMetricFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, EvaluationMetric[TInput, TTarget]]]
+ObjectiveFunctionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, ObjectiveFunction[TInput, TTarget]]]
 StopConditionFactoryAlias = FactoryAlias[Dict[str, InstanceSettings], Dict[str, StopCondition[TInput, TTarget, TModel]]]
 
 @dataclass
@@ -62,8 +62,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
     evaluation_service_factory: EvaluationServiceFactoryAlias[TInput, TTarget, TModel],
     training_dataset_factory: TrainingDatasetFactoryAlias[TInput, TTarget], 
     test_dataset_factory: EvaluationDatasetFactoryAlias[TInput, TTarget],
-    evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget, TModel],
-    objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel],
+    evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget],
+    objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget],
     stop_condition_factory: StopConditionFactoryAlias[TInput, TTarget, TModel],
     event_loop: Optional[asyncio.AbstractEventLoop] = None,
     logger: Optional[Logger] = None, 
@@ -109,8 +109,8 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
         self.__evaluation_service_factory: EvaluationServiceFactoryAlias[TInput, TTarget, TModel] = evaluation_service_factory
         self.__training_dataset_factory: TrainingDatasetFactoryAlias[TInput, TTarget] = training_dataset_factory
         self.__test_dataset_factory: EvaluationDatasetFactoryAlias[TInput, TTarget] = test_dataset_factory
-        self.__evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget, TModel] = evaluation_metric_factory
-        self.__objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget, TModel] = objective_function_factory
+        self.__evaluation_metric_factory: EvaluationMetricFactoryAlias[TInput, TTarget] = evaluation_metric_factory
+        self.__objective_function_factory: ObjectiveFunctionFactoryAlias[TInput, TTarget] = objective_function_factory
         self.__stop_condition_factory: StopConditionFactoryAlias[TModel] = stop_condition_factory
 
         self.__save_run_checkpoint_hook: Optional[Callable[[Logger, RunCheckpoint], None]] = save_run_checkpoint_hook
@@ -188,10 +188,10 @@ class DefaultMachineLearningExperimentationService(MachineLearningExperimentatio
             training_service: TrainingService[TInput, TTarget, TModel] = self.__training_service_factory(run_settings.training_service_settings)
             training_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__training_dataset_factory(run_settings.training_dataset_settings)
             stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]] =  self.__stop_condition_factory(run_settings.stop_condition_settings)
-            objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]] = self.__objective_function_factory(run_settings.objective_function_settings)
+            objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget]] = self.__objective_function_factory(run_settings.objective_function_settings)
             evaluation_service: EvaluationService[TInput, TTarget, TModel] = self.__evaluation_service_factory(run_settings.evaluation_service_settings)
             evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]] = self.__test_dataset_factory(run_settings.evaluation_dataset_settings)
-            evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
+            evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]] = self.__evaluation_metric_factory(run_settings.evaluation_metric_settings)
             
             model = event_loop.run_until_complete(training_service.train_on_multiple_datasets(model=model, datasets=training_datasets, stop_conditions=stop_conditions, objective_functions=objective_functions, id=train_run_id))
             scores: Dict[str, Dict[str, Score]] = event_loop.run_until_complete(evaluation_service.evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets, evaluation_metrics=evaluation_metrics))

@@ -10,7 +10,6 @@ from ..evaluation.abstractions.evaluation_metric import EvaluationContext
 from ..parameter_tuning.abstractions.model_factory import ModelFactory
 from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
 from ..parameter_tuning.grid_search_tuning_service import GridSearchTuningService
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..modeling.abstractions.model import Model, TInput, TTarget
 
 class GridSearchTuningServiceTestCase(unittest.TestCase):
@@ -27,9 +26,8 @@ class GridSearchTuningServiceTestCase(unittest.TestCase):
 
         model: Model[float, float] = self.model_patcher.start()
 
-        model.predict_batch = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
-        model.train = lambda X, y: None
-        model.predict = lambda X: fake.pyfloat(positive=True)
+        model.predict_step = Mock(return_value=[fake.pyfloat(positive=True) for i in range(10)])
+        model.training_step = lambda X, y: None
         model.__init__ = Mock(return_value=None)
         # model.__class__ = Model[float, float]
         model.__class__.__init__ = lambda x, y: None
@@ -48,9 +46,11 @@ class GridSearchTuningServiceTestCase(unittest.TestCase):
 
         self.objective_function_patcher = patch('machine_learning.parameter_tuning.abstractions.objective_function.ObjectiveFunction')
 
-        self.objective_function: ObjectiveFunction[float, float, Model[float, float]] = self.objective_function_patcher.start()
+        self.objective_function: ObjectiveFunction[float, float] = self.objective_function_patcher.start()
 
-        self.objective_function.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
+        self.objective_function.reset = Mock()
+        self.objective_function.update = Mock(return_value=fake.pyfloat(positive=True))
+        self.objective_function.score = Mock(return_value=fake.pyfloat(positive=True))
 
     def tearDown(self):
         self.model_patcher.stop()

@@ -20,7 +20,6 @@ from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
 from ..evaluation.abstractions.evaluation_metric import EvaluationContext
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..evaluation.default_evaluation_service import DefaultEvaluationService
 
 from .abstractions.batch_training_plugin import *
@@ -141,7 +140,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__logger.info("Finished checking stop conditions.")
         return is_any_satisfied
 
-    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None, logger: Optional[Logger] = None) -> TModel:
+    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None, logger: Optional[Logger] = None) -> TModel:
         logger = logger if not logger is None else self.__logger
         
         if model is None:
@@ -257,7 +256,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         return model
 
-    async def train_on_multiple_datasets(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, TModel]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None) -> TModel:
+    async def train_on_multiple_datasets(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None) -> TModel:
         self.__logger.info(f"Starting training on {len(datasets)} datasets...")
 
         context: MultiTrainingContext = MultiTrainingContext(current_dataset_index=0)

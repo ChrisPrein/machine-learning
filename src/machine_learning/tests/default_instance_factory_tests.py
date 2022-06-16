@@ -4,10 +4,10 @@ from typing import Any, Callable, Coroutine, List, Dict, Tuple, Type
 from ..modeling.abstractions.model import Model
 from ..experimentation.default_instance_factory import DefaultInstanceFactory
 from ..evaluation.abstractions.evaluation_service import EvaluationService
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..experimentation.abstractions.machine_learning_experimentation_service import InstanceSettings
+from ..evaluation.default_evaluation_service import *
 
-EvaluationServiceAlias = MultiTaskEvaluationService[float, float, Model[float, float]]
+EvaluationServiceAlias = DefaultEvaluationService[float, float, Model[float, float]]
 
 class DefaultInstanceFactoryTestCase(unittest.TestCase):
     def setUp(self):
@@ -25,7 +25,7 @@ class DefaultInstanceFactoryTestCase(unittest.TestCase):
 
         instance: EvaluationService[float, float, Model[float, float]] = default_instance_factory.create(default_instance_settings)
 
-        assert isinstance(instance, MultiTaskEvaluationService) 
+        assert isinstance(instance, DefaultEvaluationService) 
 
     def test_create_one_factory_function_available_should_return_valid_instance(self):
         available_types: Dict[str, Callable[[InstanceSettings], EvaluationService[float, float, Model[float, float]]]] = {'multi_task_evaluation_service': lambda **params: EvaluationServiceAlias(**params)}
@@ -36,4 +36,4 @@ class DefaultInstanceFactoryTestCase(unittest.TestCase):
 
         instance: EvaluationService[float, float, Model[float, float]] = default_instance_factory.create(default_instance_settings)
 
-        assert isinstance(instance, MultiTaskEvaluationService) 
+        assert isinstance(instance, DefaultEvaluationService) 

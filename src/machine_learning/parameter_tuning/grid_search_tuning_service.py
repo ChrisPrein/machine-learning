@@ -12,7 +12,7 @@ from ..modeling.abstractions.model import TInput, TTarget, Model
 from ..evaluation.abstractions.evaluation_metric import Prediction, TModel, EvaluationContext
 from .abstractions.parameter_tuning_service import ParameterTuningService
 
-def score_function(estimator: SkleanEstimatorAdapter[Model[TInput, TTarget]], y_target: ndarray, y_predicted: ndarray, objective_function: ObjectiveFunction[TInput, TTarget, Model[TInput, TTarget]]) -> float:
+def score_function(estimator: SkleanEstimatorAdapter[Model[TInput, TTarget]], y_target: ndarray, y_predicted: ndarray, objective_function: ObjectiveFunction[TInput, TTarget]) -> float:
     
     predictions: List[Prediction] = [Prediction(input=None, prediction=predicted, target=target) for target, predicted in zip(y_target, y_predicted)]
     context: EvaluationContext[TInput, TTarget, Model[TInput, TTarget]] = EvaluationContext[TInput, TTarget, Model[TInput, TTarget]](model=None, predictions=predictions)
@@ -23,7 +23,7 @@ class GridSearchTuningService(ParameterTuningService[TInput, TTarget, Model[TInp
     def __init__(self, folds: int = 5):
         self.__folds: int = folds
 
-    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget, Model[TInput, TTarget]]], primary_objective: str) -> Dict[str, Any]:
+    async def search(self, model_factory: ModelFactory[TModel], params: Dict[str, List[Any]], dataset: Dataset[Tuple[TInput, TTarget]], objective_functions: Dict[str, ObjectiveFunction[TInput, TTarget]], primary_objective: str) -> Dict[str, Any]:
         if model_factory is None:
             raise ValueError("model_factory can't be empty")
 

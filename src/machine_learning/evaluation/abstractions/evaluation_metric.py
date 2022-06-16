@@ -4,11 +4,20 @@ from dataclasses import dataclass
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from ..contexts.evaluation_context import *
 
-class EvaluationMetric(Generic[TInput, TTarget, TModel], ABC):
+class EvaluationMetric(Generic[TInput, TTarget], ABC):
     
     @abstractmethod
-    def calculate_score(self, context: EvaluationContext[TInput, TTarget, TModel]) -> float:
+    def reset(self):
         pass
 
-    def __call__(self, context: EvaluationContext[TInput, TTarget, TModel]) -> float:
-        return self.calculate_score(context)
+    @abstractmethod
+    def update(self, batch: List[Prediction[TInput, TTarget]]):
+        pass
+
+    @property
+    @abstractmethod
+    def score(self) -> float:
+        pass
+
+    def __call__(self, batch: List[Prediction[TInput, TTarget]]):
+        return self.update(batch)

@@ -9,7 +9,7 @@ class OptimizationType(Enum):
     MIN = 1,
     MAX = 2
 
-class ObjectiveFunction(EvaluationMetric[TInput, TTarget, TModel], ABC):
+class ObjectiveFunction(EvaluationMetric[TInput, TTarget], ABC):
     @property
     @abstractmethod
     def optimization_type(self) -> OptimizationType:

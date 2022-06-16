@@ -9,7 +9,6 @@ from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
 from .abstractions.evaluation_service import EvaluationService, Score
-from .default_evaluation import default_evaluation
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -94,7 +93,17 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         return [Prediction(result[0], result[1], result[2]) for result in combined]
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> Dict[str, Score]:
+    def __reset_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]):
+        logger.debug("Reseting evaluation metrics...")
+        for metric_name, evaluation_metrtic in evaluation_metrics.items():
+            evaluation_metrtic.reset()
+
+    def __update_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], batch: List[Prediction]):
+        logger.debug("Updating evaluation metrics...")
+        for metric_name, evaluation_metrtic in evaluation_metrics.items():
+            evaluation_metrtic.update(batch)
+
+    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
         
@@ -120,6 +129,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, [], 0)
 
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
+
+        self.__reset_evaluation_metrics(logger, evaluation_metrics)
 
         logger.info('Starting evaluation loop...')
         evaluation_start_time: float = time.time()
@@ -154,6 +165,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             evaluation_context.predictions.extend(predictions)
 
+            self.__update_evaluation_metrics(logger, evaluation_metrics, predictions)
+
             self.__execute_post_evaluation_step_plugins(logger, evaluation_context)
 
             iteration_end_time = time.time()
@@ -167,12 +180,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
         logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
 
-        result: Dict[str, Score] = {}
-
-        for i, (name, evaluation_metric) in enumerate(evaluation_metrics.items()):
-            value: float = evaluation_metric.calculate_score(context=evaluation_context)
-
-            result[name] = Score(value, name, dataset_name)
+        result: Dict[str, Score] = {name: Score(evaluation_metric.score, name, dataset_name) for name, evaluation_metric in evaluation_metrics.items()}
 
         logger.info('Finished evaluation loop.')
         logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")
@@ -181,12 +189,12 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         return result
 
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]], logger: Logger) -> Tuple[str, Dict[str, Score]]:
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Logger) -> Tuple[str, Dict[str, Score]]:
         result = await self.evaluate(model, evaluation_dataset, evaluation_metrics, logger)
 
         return (evaluation_dataset[0], result)
 
-    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TModel]]) -> Dict[str, Dict[str, Score]]:
+    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
         self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
 
         context: MultiEvaluationContext = MultiEvaluationContext(current_dataset_index=0, scores={})

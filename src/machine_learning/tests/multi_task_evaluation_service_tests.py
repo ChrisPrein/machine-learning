@@ -11,8 +11,8 @@ from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..modeling.abstractions.model import Model, TInput, TTarget
+from ..evaluation.default_evaluation_service import *
 
 class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
@@ -22,15 +22,19 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.model: Model[str, str] = MagicMock(spec=Model)
 
-        self.model.predict_batch = Mock(return_value=[fake.last_name() for i in range(10)])
+        self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
 
-        self.evaluation_metric_1: EvaluationMetric[str, str, Model[str, str]] = MagicMock(spec=EvaluationMetric)
+        self.evaluation_metric_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
 
-        self.evaluation_metric_1.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
+        self.evaluation_metric_1.reset = Mock()
+        self.evaluation_metric_1.update = Mock()
+        self.evaluation_metric_1.score = Mock(return_value=fake.pyfloat(positive=True))
 
-        self.evaluation_metric_2: EvaluationMetric[str, str, Model[str, str]] = MagicMock(spec=EvaluationMetric)
+        self.evaluation_metric_2: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
 
-        self.evaluation_metric_2.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
+        self.evaluation_metric_2.reset = Mock()
+        self.evaluation_metric_2.update = Mock()
+        self.evaluation_metric_2.score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.dataset: Dataset[Tuple[str, str]] = Mock()
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
@@ -38,7 +42,7 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.event_loop = asyncio.get_event_loop()
 
-        self.evaluation_service: MultiTaskEvaluationService[str, str, Model[str, str]] = MultiTaskEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop)
+        self.evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop)
 
     def tearDown(self):
         pass

@@ -11,7 +11,6 @@ from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
 from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
-from ..evaluation.multi_task_evaluation_service import MultiTaskEvaluationService
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from ..training.batch_training_service import BatchTrainingService
 from ..training.abstractions.stop_condition import StopCondition
@@ -24,13 +23,13 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(100)]
 
         self.model: Model[str, str] = MagicMock(spec=Model)
-        self.model.predict_batch = Mock(return_value=[fake.last_name() for i in range(10)])
+        self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
 
-        self.objective_function_1: ObjectiveFunction[str, str, Model[str, str]] = MagicMock(spec=ObjectiveFunction)
-        self.objective_function_1.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
+        self.objective_function_1: ObjectiveFunction[str, str] = MagicMock(spec=ObjectiveFunction)
+        self.objective_function_1.score = Mock(return_value=fake.pyfloat(positive=True))
 
-        self.objective_function_2: ObjectiveFunction[str, str, Model[str, str]] = MagicMock(spec=ObjectiveFunction)
-        self.objective_function_2.calculate_score = Mock(return_value=fake.pyfloat(positive=True))
+        self.objective_function_2: ObjectiveFunction[str, str] = MagicMock(spec=ObjectiveFunction)
+        self.objective_function_2.score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.dataset: Dataset[Tuple[str, str]] = Mock()
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
