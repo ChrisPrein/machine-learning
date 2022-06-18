@@ -210,7 +210,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset_name, dataset = list(evaluation_datasets.items())[dataset_index]
 
             evaluation_logger: Logger = self.__logger.getChild(dataset_name)
-            context.scores[dataset_name] = self.evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
+            context.scores[dataset_name] = await self.evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
 
             self.__execute_post_multi_evaluation_step_plugins(self.__logger, context)
 
