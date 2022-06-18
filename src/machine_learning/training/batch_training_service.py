@@ -268,7 +268,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             self.__execute_pre_multi_train_step_plugins(self.__logger, context)
 
-            dataset_name, dataset = list(datasets.items())[0]
+            dataset_name, dataset = list(datasets.items())[dataset_index]
 
             training_run_logger: Logger = self.__logger.getChild(dataset_name)
             model = await self.train(model, (dataset_name, dataset), stop_conditions, objective_functions, primary_objective, validation_dataset, training_run_logger)

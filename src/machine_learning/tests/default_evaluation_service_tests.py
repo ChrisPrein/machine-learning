@@ -14,7 +14,7 @@ from ..evaluation.abstractions.evaluation_metric import EvaluationMetric
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from ..evaluation.default_evaluation_service import *
 
-class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
+class DefaultEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
         fake = Faker()
 
@@ -25,15 +25,9 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
 
         self.evaluation_metric_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
-
-        self.evaluation_metric_1.reset = Mock()
-        self.evaluation_metric_1.update = Mock()
         self.evaluation_metric_1.score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.evaluation_metric_2: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
-
-        self.evaluation_metric_2.reset = Mock()
-        self.evaluation_metric_2.update = Mock()
         self.evaluation_metric_2.score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.dataset: Dataset[Tuple[str, str]] = Mock()
@@ -42,13 +36,13 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
 
         self.event_loop = asyncio.get_event_loop()
 
-        self.evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](event_loop=self.event_loop)
-
     def tearDown(self):
         pass
 
     def test_evaluate_valid_model_metrics_and_dataset_should_return_results_for_each_metric(self):
-        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = self.evaluation_service.evaluate(self.model, self.dataset, 
+        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+
+        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.dataset, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
@@ -56,9 +50,11 @@ class MultiTaskEvaluationServiceTestCase(unittest.TestCase):
         assert len(result.items()) == 2
 
     def test_evaluation_on_multiple_datasets_valid_model_metrics_and_datasets_should_return_results_for_each_metric_on_each_dataset(self):
+        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+
         datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
 
-        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = self.evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
+        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
             {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, Dict[str, float]] = self.event_loop.run_until_complete(evaluation_routine)

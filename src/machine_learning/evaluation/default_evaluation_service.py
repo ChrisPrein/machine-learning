@@ -202,12 +202,12 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         self.__execute_pre_multi_loop_plugins(self.__logger, context)
 
-        for dataset_index in range(context.current_dataset_index, evaluation_datasets.items()):
+        for dataset_index in range(context.current_dataset_index, len(evaluation_datasets)):
             context.current_dataset_index = dataset_index
 
             self.__execute_pre_multi_evaluation_step_plugins(self.__logger, context)
 
-            dataset_name, dataset = evaluation_datasets.items()[0]
+            dataset_name, dataset = list(evaluation_datasets.items())[dataset_index]
 
             evaluation_logger: Logger = self.__logger.getChild(dataset_name)
             context.scores[dataset_name] = self.evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
