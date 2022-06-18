@@ -1,3 +1,4 @@
+from collections import deque
 from logging import Logger
 import logging
 from typing import List, Optional, Dict, Tuple, Union
@@ -126,7 +127,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset = evaluation_dataset
             dataset_name = type(dataset).__name__
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, [], 0)
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([]), 0)
 
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
@@ -149,7 +150,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         batch_load_start_time = time.time()
 
-        for batch_index, batch in enumerate(tqdm(data_loader, miniters=len(dataset)/100)[evaluation_context.current_batch_index:]):
+        for batch_index, batch in enumerate(tqdm(data_loader, miniters=len(dataset)/100, initial=evaluation_context.current_batch_index)):
             evaluation_context.current_batch_index = batch_index
 
             iteration_start_time = time.time()

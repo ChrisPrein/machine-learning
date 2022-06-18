@@ -15,7 +15,7 @@ import time
 from machine_learning.training.abstractions.batch_training_plugin import BatchTrainingPlugin, PostEpoch, PostLoop, PostMultiLoop, PostTrain, PreEpoch, PreLoop, PreMultiLoop, PreTrain
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
-from ..parameter_tuning.abstractions.objective_function import ObjectiveFunction
+from .abstractions.objective_function import ObjectiveFunction
 from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.training_service import TrainingService
@@ -205,7 +205,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             batch_load_start_time = time.time()
 
-            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100)[training_context.current_batch_index:]):
+            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100, initial=training_context.current_batch_index)):
                 training_context.current_batch_index = batch_index
 
                 iteration_start_time = time.time()
@@ -268,7 +268,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             self.__execute_pre_multi_train_step_plugins(self.__logger, context)
 
-            dataset_name, dataset = datasets.items()[0]
+            dataset_name, dataset = list(datasets.items())[0]
 
             training_run_logger: Logger = self.__logger.getChild(dataset_name)
             model = await self.train(model, (dataset_name, dataset), stop_conditions, objective_functions, primary_objective, validation_dataset, training_run_logger)

@@ -14,8 +14,8 @@ class Prediction(Generic[TInput, TTarget]):
     prediction: TTarget
     target: TTarget
 
-@dataclass(frozen=True)
-class EvaluationContext(Generic[TInput, TTarget, TModel], ABC):
+@dataclass
+class EvaluationContext(Generic[TInput, TTarget, TModel]):
     model: TModel
     dataset_name: str
     predictions: Deque[Prediction[TInput, TTarget]]

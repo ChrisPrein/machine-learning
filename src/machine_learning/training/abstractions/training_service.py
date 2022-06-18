@@ -6,7 +6,7 @@ from typing import Optional, TypeVar, List, Generic, Dict, Tuple, Union, overloa
 from uuid import UUID
 from torch.utils.data.dataset import Dataset
 
-from ...parameter_tuning.abstractions.objective_function import ObjectiveFunction
+from .objective_function import ObjectiveFunction
 from ...modeling.abstractions.model import TInput, TTarget
 from .stop_condition import TModel, StopCondition, TrainingContext
 
