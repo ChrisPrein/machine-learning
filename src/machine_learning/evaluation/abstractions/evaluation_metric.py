@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, List, Generic
+from typing import TypeVar, List, Generic, Union
 from dataclasses import dataclass
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from ..contexts.evaluation_context import *
@@ -16,7 +16,7 @@ class EvaluationMetric(Generic[TInput, TTarget], ABC):
 
     @property
     @abstractmethod
-    def score(self) -> float:
+    def score(self) -> Union[float, Dict[str, float]]:
         pass
 
     def __call__(self, batch: List[Prediction[TInput, TTarget]]):

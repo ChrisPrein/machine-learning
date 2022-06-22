@@ -26,10 +26,10 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
 
         self.evaluation_metric_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
-        self.evaluation_metric_1.score = Mock(return_value=fake.pyfloat(positive=True))
+        self.evaluation_metric_1.score = fake.pyfloat(positive=True)
 
         self.evaluation_metric_2: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
-        self.evaluation_metric_2.score = Mock(return_value=fake.pyfloat(positive=True))
+        self.evaluation_metric_2.score = fake.pyfloat(positive=True)
 
         self.dataset: Dataset[Tuple[str, str]] = Mock()
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))

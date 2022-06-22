@@ -181,7 +181,18 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
         logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
 
-        result: Dict[str, Score] = {name: Score(evaluation_metric.score, name, dataset_name) for name, evaluation_metric in evaluation_metrics.items()}
+        result: Dict[str, Score] = {}
+
+        for metric_name, metric in evaluation_metrics.items():
+            current_scores: Dict[str, Score] = {}
+
+            if isinstance(metric.score, float):
+                current_scores[metric_name] = Score(metric.score, metric_name, dataset_name)
+            elif isinstance(metric.score, dict):
+                current_scores = {name: Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.score.items()}
+
+            result.update(current_scores)
+
 
         logger.info('Finished evaluation loop.')
         logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")
