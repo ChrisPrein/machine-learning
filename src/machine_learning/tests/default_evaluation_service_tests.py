@@ -21,6 +21,8 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
 
         self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(10)]
 
+        self.prediction_sample: List[Prediction[str, str]] = [Prediction[str, str](fake.first_name(), fake.last_name(), fake.last_name()) for i in range(10)]
+
         self.model: Model[str, str] = MagicMock(spec=Model)
 
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
@@ -35,6 +37,10 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
         self.dataset.__len__ = Mock(return_value=self.samples.__len__())
 
+        self.predictions: Dataset[Prediction[str, str]] = Mock()
+        self.predictions.__getitem__ = Mock(return_value=random.choice(self.prediction_sample))
+        self.predictions.__len__ = Mock(return_value=self.samples.__len__())
+
         self.event_loop = asyncio.get_event_loop()
 
     def tearDown(self):
@@ -44,6 +50,16 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.dataset, 
+                    {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
+
+        result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
+
+        assert len(result.items()) == 2
+
+    def test_evaluate_predictions_valid_model_metrics_and_predictions_should_return_result_for_each_metric(self):
+        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+
+        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate_predictions(self.predictions, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)

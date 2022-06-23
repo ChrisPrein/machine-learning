@@ -16,7 +16,7 @@ class EvaluationMetric(Generic[TInput, TTarget], ABC):
 
     @property
     @abstractmethod
-    def score(self) -> Union[float, Dict[str, float]]:
+    def score(self) -> float:
         pass
 
     def __call__(self, batch: List[Prediction[TInput, TTarget]]):
