@@ -8,7 +8,8 @@ from attr import asdict
 
 from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import Model, TInput, TTarget
-from .abstractions.evaluation_metric import EvaluationContext, EvaluationMetric, Prediction, TModel
+from .abstractions.evaluation_metric import *
+from .abstractions.multi_metric import *
 from .abstractions.evaluation_service import EvaluationService, Score
 import asyncio
 import asyncio.tasks
@@ -181,8 +182,14 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
         logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
 
-        result: Dict[str, Score] = {name: Score(evaluation_metric.score, name, dataset_name) for name, evaluation_metric in evaluation_metrics.items()}
+        result: Dict[str, Score] = {}
 
+        for metric_name, metric in evaluation_metrics.items():
+            if isinstance(metric, MultiMetric):
+                current_scores = {name: Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.scores.items()}
+                result.update(current_scores)
+            else:
+                result[metric_name] = Score(metric.score, metric_name, dataset_name)
 
         logger.info('Finished evaluation loop.')
         logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")
@@ -263,8 +270,14 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
         logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
 
-        result: Dict[str, Score] = {name: Score(evaluation_metric.score, name, dataset_name) for name, evaluation_metric in evaluation_metrics.items()}
+        result: Dict[str, Score] = {}
 
+        for metric_name, metric in evaluation_metrics.items():
+            if isinstance(metric, MultiMetric):
+                current_scores = {name: Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.scores.items()}
+                result.update(current_scores)
+            else:
+                result[metric_name] = Score(metric.score, metric_name, dataset_name)
 
         logger.info('Finished evaluation loop.')
         logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")

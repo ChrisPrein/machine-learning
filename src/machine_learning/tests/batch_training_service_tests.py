@@ -8,8 +8,8 @@ import random
 
 from ..modeling.abstractions.model import *
 from ..training.batch_training_service import *
-from ..training.abstractions.objective_function import *
 from ..training.abstractions.batch_training_plugin import *
+from ..evaluation.abstractions.evaluation_metric import *
 
 class BatchTrainingServiceTestCase(unittest.TestCase):
     def setUp(self):
@@ -21,10 +21,10 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
         self.model.training_step = Mock(return_value=fake.pyfloat(positive=True))
 
-        self.objective_function_1: ObjectiveFunction[str, str] = MagicMock(spec=ObjectiveFunction)
+        self.objective_function_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
         self.objective_function_1.score = Mock(return_value=fake.pyfloat(positive=True))
 
-        self.objective_function_2: ObjectiveFunction[str, str] = MagicMock(spec=ObjectiveFunction)
+        self.objective_function_2: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
         self.objective_function_2.score = Mock(return_value=fake.pyfloat(positive=True))
 
         self.dataset: Dataset[Tuple[str, str]] = Mock()
