@@ -3,9 +3,6 @@ from logging import Logger
 import logging
 from typing import List, Optional, Dict, Tuple, Union
 import time
-
-from attr import asdict
-
 from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import *
@@ -274,7 +271,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         for metric_name, metric in evaluation_metrics.items():
             if isinstance(metric, MultiMetric):
-                current_scores = {name: Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.scores.items()}
+                current_scores = {f'{metric_name}/{name}': Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.scores.items()}
                 result.update(current_scores)
             else:
                 result[metric_name] = Score(metric.score, metric_name, dataset_name)

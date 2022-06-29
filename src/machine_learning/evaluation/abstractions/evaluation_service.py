@@ -4,7 +4,6 @@ from typing import TypeVar, List, Generic, Dict, Tuple, Union
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from .evaluation_metric import EvaluationMetric
 from torch.utils.data.dataset import Dataset
-from multipledispatch import dispatch
 
 from .default_evaluation_plugin import *
 

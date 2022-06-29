@@ -166,7 +166,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         else:
             current_dataset = (type(dataset).__name__, dataset)
 
-        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=current_dataset[0], scores={objective: deque([], self.__max_scores) for objective in evaluation_metrics.keys()}, train_losses=deque([], self.__max_losses), _primary_objective=primary_objective, current_epoch=0, current_batch_index=0)
+        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=current_dataset[0], scores={}, train_losses=deque([], self.__max_losses), _primary_objective=primary_objective, current_epoch=0, current_batch_index=0)
 
         training_size: int = int(len(current_dataset[1]) * self.__training_dataset_size_ratio)
         validation_size: int = int(len(current_dataset[1]) - training_size)
@@ -242,7 +242,10 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             logger.info("finished evaluating current model.")
 
             for key, evaluation_score in evaluation_scores.items():
-                training_context.scores[key].append(evaluation_score)
+                if not key in training_context.scores:
+                    training_context.scores[key] = deque([], self.__max_scores)
+                else:
+                    training_context.scores[key].append(evaluation_score)
 
             self.__execute_post_epoch_plugins(logger, training_context)
 
