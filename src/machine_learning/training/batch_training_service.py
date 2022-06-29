@@ -244,8 +244,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             for key, evaluation_score in evaluation_scores.items():
                 if not key in training_context.scores:
                     training_context.scores[key] = deque([], self.__max_scores)
-                else:
-                    training_context.scores[key].append(evaluation_score)
+                    
+                training_context.scores[key].append(evaluation_score)
 
             self.__execute_post_epoch_plugins(logger, training_context)
 
