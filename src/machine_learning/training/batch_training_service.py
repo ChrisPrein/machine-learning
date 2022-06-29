@@ -122,7 +122,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         self.__logger.info("Checking stop conditions...")
         is_any_satisfied: bool = False
 
-        if training_context.current_epoch > self.__max_epochs: 
+        if training_context.current_epoch >= self.__max_epochs: 
             self.__logger.info("Max number of epochs reached.")
             is_any_satisfied = True
         else:
