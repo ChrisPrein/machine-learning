@@ -28,7 +28,7 @@ nest_asyncio.apply()
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
     batch_size: int = 1, drop_last: bool = True, event_loop: Optional[asyncio.AbstractEventLoop] = None, max_epochs: int = 100, 
-    max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, max_losses: Optional[int] = None, max_scores: Optional[int] = None, plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {}):
+    max_iterations: int = 10000, training_dataset_size_ratio: float = 0.8, max_losses: Optional[int] = None, max_scores: Optional[int] = None, plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {}, **kwargs):
         self.__logger = logger if not logger is None else logging.getLogger()
         
         if evaluation_service is None:
