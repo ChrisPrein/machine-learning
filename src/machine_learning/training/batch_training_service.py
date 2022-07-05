@@ -217,7 +217,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 targets: List[TTarget] = [value[1] for value in batch]
 
                 logger.debug("Executing training step.")
-                train_loss: float = model.training_step(inputs, targets)
+                train_loss: Union[float, Dict[str, float]] = model.training_step(inputs, targets)
                 
                 training_context.train_losses.append(train_loss)
 

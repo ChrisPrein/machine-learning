@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
-from typing import Dict, Generic, List, Tuple, Deque
+from typing import Dict, Generic, List, Tuple, Deque, Union
 from torch.utils.data import Dataset, random_split
 
 from ...evaluation.abstractions.evaluation_service import Score
@@ -16,7 +16,7 @@ class TrainingContext(Generic[TInput, TTarget, TModel]):
     current_epoch: int
     current_batch_index: int
     scores: Dict[str, Deque[Score]]
-    train_losses: Deque[float]
+    train_losses: Deque[Union[float, Dict[str, float]]]
     _primary_objective: str
 
     @property
