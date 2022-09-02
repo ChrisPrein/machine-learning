@@ -231,8 +231,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
                 batch_load_start_time = time.time()
 
-            logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
-            logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
+            logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times if count_batch_load_times > 0 else sum_batch_load_time} seconds.")
+            logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times if count_iteration_run_times > 0 else sum_iteration_run_time} seconds.")
 
             logger.info("Evaluating current model.")
             evaluation_scores: Dict[str, Score] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=evaluation_metrics)

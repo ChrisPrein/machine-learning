@@ -20,12 +20,13 @@ nest_asyncio.apply()
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     def __init__(self, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, 
-    event_loop: Optional[asyncio.AbstractEventLoop] = None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, **kwargs):
+    event_loop: Optional[asyncio.AbstractEventLoop] = None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
         self.__logger = logger if not logger is None else logging.getLogger()
         self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
         self.__batch_size: int = batch_size
         self.__drop_last: bool = drop_last
         self.__max_predictions: Optional[int] = max_predictions
+        self.__max_losses: Optional[int] = max_losses
 
         self.__pre_multi_loop_plugins: Dict[str, PreMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiLoop), plugins.items()))
         self.__post_multi_loop_plugins: Dict[str, PostMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiLoop), plugins.items()))
@@ -84,14 +85,14 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_evaluation_step(logger, context)
 
-    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> List[Prediction]:
+    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> Tuple[List[Prediction], Union[float, Dict[str, float]]]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TInput] = [sample[1] for sample in batch]
-        predictions: List[TTarget] = model.predict_step(inputs)
+        predictions, loss = model.evaluation_step(inputs)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
-        return [Prediction(result[0], result[1], result[2]) for result in combined]
+        return [Prediction(result[0], result[1], result[2]) for result in combined], loss
 
     def __reset_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]):
         logger.debug("Reseting evaluation metrics...")
@@ -126,7 +127,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset = evaluation_dataset
             dataset_name = type(dataset).__name__
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([], self.__max_predictions), 0)
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
 
         data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
@@ -161,9 +162,10 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             self.__execute_pre_evaluation_step_plugins(logger, evaluation_context)
             
-            predictions: List[Prediction] = self.__predict_batch(evaluation_context, model, batch)
+            predictions, loss = self.__predict_batch(evaluation_context, model, batch)
 
             evaluation_context.predictions.extend(predictions)
+            evaluation_context.losses.extend(loss)
 
             self.__update_evaluation_metrics(logger, evaluation_metrics, predictions)
 
