@@ -8,6 +8,7 @@ from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import *
 from .abstractions.multi_metric import *
 from .abstractions.evaluation_service import EvaluationService, Score
+from ..operators.true_division import *
 import asyncio
 import asyncio.tasks
 import asyncio.futures
@@ -104,6 +105,9 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
 
+    # def __run_time(self, sum_run_time: float, count_run_times: float) -> float:
+    #     return sum_run_time / count_run_times if count_run_times != 0 else 0
+
     async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
@@ -179,8 +183,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             batch_load_start_time = time.time()
 
-        logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
-        logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
+        logger.info(f"Each batch load took around {sum_batch_load_time /allow_zero/ count_batch_load_times} seconds.")
+        logger.info(f"Each iteration took around {sum_iteration_run_time /allow_zero/ count_iteration_run_times} seconds.")
 
         result: Dict[str, Score] = {}
 
@@ -267,8 +271,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             batch_load_start_time = time.time()
 
-        logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times} seconds.")
-        logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times} seconds.")
+        logger.info(f"Each batch load took around {sum_batch_load_time /allow_zero/ count_batch_load_times} seconds.")
+        logger.info(f"Each iteration took around {sum_iteration_run_time /allow_zero/ count_iteration_run_times} seconds.")
 
         result: Dict[str, Score] = {}
 
