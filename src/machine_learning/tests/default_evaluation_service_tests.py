@@ -26,6 +26,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         self.model: Model[str, str] = MagicMock(spec=Model)
 
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
+        self.model.evaluation_step = Mock(return_value=([fake.last_name() for i in range(10)], fake.pyfloat(positive=True)))
 
         self.evaluation_metric_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
         self.evaluation_metric_1.score = fake.pyfloat(positive=True)

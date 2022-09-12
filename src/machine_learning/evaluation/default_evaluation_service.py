@@ -165,7 +165,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             predictions, loss = self.__predict_batch(evaluation_context, model, batch)
 
             evaluation_context.predictions.extend(predictions)
-            evaluation_context.losses.extend(loss)
+            evaluation_context.losses.append(loss)
 
             self.__update_evaluation_metrics(logger, evaluation_metrics, predictions)
 
@@ -218,7 +218,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset = predictions
             dataset_name = type(dataset).__name__
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](None, dataset_name, deque([], self.__max_predictions), 0)
+        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](None, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
 
         data_loader: DataLoader[Prediction[TInput, TTarget]] = DataLoader[Prediction[TInput, TTarget]](dataset=predictions, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
