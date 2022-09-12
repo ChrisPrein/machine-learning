@@ -88,8 +88,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
     def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> Tuple[List[Prediction], Union[float, Dict[str, float]]]:
         inputs: List[TInput] = [sample[0] for sample in batch]
-        targets: List[TInput] = [sample[1] for sample in batch]
-        predictions, loss = model.evaluation_step(inputs)
+        targets: List[TTarget] = [sample[1] for sample in batch]
+        predictions, loss = model.evaluation_step(inputs, targets)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
@@ -104,9 +104,6 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         logger.debug("Updating evaluation metrics...")
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
-
-    # def __run_time(self, sum_run_time: float, count_run_times: float) -> float:
-    #     return sum_run_time / count_run_times if count_run_times != 0 else 0
 
     async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
