@@ -1,10 +1,8 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
-from logging import Logger
-from typing import Dict, Generic, List, Tuple, Deque, TypeVar
-from torch.utils.data import Dataset, random_split
+from typing import *
 
-from ...modeling.abstractions.model import Model, TInput, TTarget
+from ...modeling.abstractions.model import TInput, TTarget
 from .evaluation_context import *
 
 @dataclass(frozen=True)

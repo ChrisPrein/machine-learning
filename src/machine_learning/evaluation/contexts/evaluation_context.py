@@ -1,10 +1,7 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from logging import Logger
-from typing import Dict, Generic, List, Optional, Tuple, Deque, TypeVar, Union
-from torch.utils.data import Dataset, random_split
+from typing import *
 
-from ...modeling.abstractions.model import Model, TInput, TTarget
+from ...modeling.abstractions.model import *
 
 TModel = TypeVar('TModel', bound=Model)
 

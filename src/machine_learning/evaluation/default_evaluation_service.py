@@ -13,7 +13,6 @@ import asyncio
 import asyncio.tasks
 import asyncio.futures
 from dataset_handling.dataloader import DataLoader
-from torch.utils.data.dataset import Dataset
 from tqdm import tqdm
 import nest_asyncio
 
@@ -105,7 +104,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
+    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Iterable[Tuple[TInput, TTarget]]], Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
         
@@ -118,7 +117,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        dataset: Dataset[Tuple[TInput, TTarget]] = None
+        dataset: Iterable[Tuple[TInput, TTarget]] = None
         dataset_name: str = None
 
         if isinstance(evaluation_dataset, Tuple):
@@ -199,7 +198,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         return result
 
-    async def evaluate_predictions(self, predictions: Union[Tuple[str, Dataset[Prediction[TInput, TTarget]]], Dataset[Prediction[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
+    async def evaluate_predictions(self, predictions: Union[Tuple[str, Iterable[Prediction[TInput, TTarget]]], Iterable[Prediction[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
         
@@ -209,7 +208,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        dataset: Dataset[Tuple[TInput, TTarget]] = None
+        dataset: Iterable[Tuple[TInput, TTarget]] = None
         dataset_name: str = None
 
         if isinstance(predictions, Tuple):
@@ -287,12 +286,12 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         return result
 
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Logger) -> Tuple[str, Dict[str, Score]]:
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Logger) -> Tuple[str, Dict[str, Score]]:
         result = await self.evaluate(model, evaluation_dataset, evaluation_metrics, logger)
 
         return (evaluation_dataset[0], result)
 
-    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
+    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
         self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
 
         context: MultiEvaluationContext = MultiEvaluationContext(current_dataset_index=0, scores={})

@@ -8,17 +8,14 @@ from ..contexts.evaluation_context import *
 class EvaluationMetric(Generic[TInput, TTarget], ABC):
 
     @abstractmethod
-    def reset(self):
-        pass
+    def reset(self): ...
 
     @abstractmethod
-    def update(self, batch: List[Prediction[TInput, TTarget]]):
-        pass
+    def update(self, batch: List[Prediction[TInput, TTarget]]): ...
 
     @property
     @abstractmethod
-    def score(self) -> float:
-        pass
+    def score(self) -> float: ...
 
     def __call__(self, batch: List[Prediction[TInput, TTarget]]):
         return self.update(batch)
