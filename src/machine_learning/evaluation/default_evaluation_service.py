@@ -104,7 +104,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Iterable[Tuple[TInput, TTarget]]], Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
+    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
         
@@ -117,7 +117,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        dataset: Iterable[Tuple[TInput, TTarget]] = None
+        dataset: Iterable[Iterable[Tuple[TInput, TTarget]]] = None
         dataset_name: str = None
 
         if isinstance(evaluation_dataset, Tuple):
@@ -128,8 +128,6 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             dataset_name = type(dataset).__name__
 
         evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
-
-        data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=dataset, batch_size=self.__batch_size, drop_last=self.__drop_last)
 
         self.__reset_evaluation_metrics(logger, evaluation_metrics)
 
@@ -150,7 +148,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
         batch_load_start_time = time.time()
 
-        for batch_index, batch in enumerate(tqdm(data_loader, miniters=len(dataset)/100, initial=evaluation_context.current_batch_index)):
+        for batch_index, batch in enumerate(tqdm(dataset, miniters=len(dataset)/100, initial=evaluation_context.current_batch_index)):
             evaluation_context.current_batch_index = batch_index
 
             iteration_start_time = time.time()
@@ -198,100 +196,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         return result
 
-    async def evaluate_predictions(self, predictions: Union[Tuple[str, Iterable[Prediction[TInput, TTarget]]], Iterable[Prediction[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
-        if logger is None:
-            logger = self.__logger
-        
-        if predictions is None:
-            raise ValueError("predictions")
-
-        if evaluation_metrics is None:
-            raise ValueError("evaluation_metrics")
-
-        dataset: Iterable[Tuple[TInput, TTarget]] = None
-        dataset_name: str = None
-
-        if isinstance(predictions, Tuple):
-            dataset = predictions[1]
-            dataset_name = predictions[0]
-        else:
-            dataset = predictions
-            dataset_name = type(dataset).__name__
-
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](None, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
-
-        data_loader: DataLoader[Prediction[TInput, TTarget]] = DataLoader[Prediction[TInput, TTarget]](dataset=predictions, batch_size=self.__batch_size, drop_last=self.__drop_last)
-
-        self.__reset_evaluation_metrics(logger, evaluation_metrics)
-
-        logger.info('Starting evaluation loop...')
-        evaluation_start_time: float = time.time()
-
-        self.__execute_pre_loop_plugins(logger, evaluation_context)
-
-        sum_iteration_run_time: float = 0
-        count_iteration_run_times: int = 0
-
-        sum_batch_load_time: float = 0
-        count_batch_load_times: int = 0
-
-        iteration_start_time: float = 0
-        iteration_end_time: float = 0
-        batch_load_start_time: float = 0
-
-        batch_load_start_time = time.time()
-
-        for batch_index, predictions in enumerate(tqdm(data_loader, miniters=len(dataset)/100, initial=evaluation_context.current_batch_index)):
-            evaluation_context.current_batch_index = batch_index
-
-            iteration_start_time = time.time()
-
-            sum_batch_load_time += iteration_start_time - batch_load_start_time
-            count_batch_load_times += 1
-
-            logger.debug(f"Batch load took {iteration_start_time - batch_load_start_time} seconds.")
-
-            self.__execute_pre_evaluation_step_plugins(logger, evaluation_context)
-
-            evaluation_context.predictions.extend(predictions)
-
-            self.__update_evaluation_metrics(logger, evaluation_metrics, predictions)
-
-            self.__execute_post_evaluation_step_plugins(logger, evaluation_context)
-
-            iteration_end_time = time.time()
-            sum_iteration_run_time += iteration_end_time - iteration_start_time
-            count_iteration_run_times += 1
-
-            logger.debug(f"Iteration took {iteration_end_time - iteration_start_time} seconds.")
-
-            batch_load_start_time = time.time()
-
-        logger.info(f"Each batch load took around {sum_batch_load_time /allow_zero/ count_batch_load_times} seconds.")
-        logger.info(f"Each iteration took around {sum_iteration_run_time /allow_zero/ count_iteration_run_times} seconds.")
-
-        result: Dict[str, Score] = {}
-
-        for metric_name, metric in evaluation_metrics.items():
-            if isinstance(metric, MultiMetric):
-                current_scores = {f'{metric_name}/{name}': Score(value, f'{metric_name}/{name}', dataset_name) for name, value in metric.scores.items()}
-                result.update(current_scores)
-            else:
-                result[metric_name] = Score(metric.score, metric_name, dataset_name)
-
-        logger.info('Finished evaluation loop.')
-        logger.info(f"Epoch took {time.time() - evaluation_start_time} seconds.")
-
-        self.__execute_post_loop_plugins(logger, evaluation_context, result)
-        
-        return result
-
-    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Logger) -> Tuple[str, Dict[str, Score]]:
-        result = await self.evaluate(model, evaluation_dataset, evaluation_metrics, logger)
-
-        return (evaluation_dataset[0], result)
-
-    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Iterable[Tuple[TInput, TTarget]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
+    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
         self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
 
         context: MultiEvaluationContext = MultiEvaluationContext(current_dataset_index=0, scores={})
