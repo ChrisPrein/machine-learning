@@ -9,23 +9,16 @@ from ...evaluation.abstractions.evaluation_service import Score
 from ...modeling.abstractions.model import Model, TInput, TTarget
 from ...evaluation.contexts.evaluation_context import *
 
+TModel = TypeVar('TModel', bound=Model)
+
 @dataclass
 class TrainingContext(Generic[TInput, TTarget, TModel]):
     model: TModel
     dataset_name: str
     current_epoch: int
     current_batch_index: int
-    scores: Dict[str, Deque[Score]]
     train_losses: Deque[Union[float, Dict[str, float]]]
-    _primary_objective: str
-
-    @property
-    def primary_scores(self) -> List[Score]:
-        return self.scores[self._primary_objective]
-
-    @property
-    def current_scores(self) -> Dict[str, Score]:
-        return {score_name: scores[self.current_epoch - 1] for score_name, scores in self.scores.items() if self.current_epoch > 0}
+    continue_training: bool
 
 @dataclass
 class MultiTrainingContext(Generic[TInput, TTarget, TModel]):

@@ -15,15 +15,23 @@ import time
 from machine_learning.training.abstractions.batch_training_plugin import BatchTrainingPlugin, PostEpoch, PostLoop, PostMultiLoop, PostTrain, PreEpoch, PreLoop, PreMultiLoop, PreTrain
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
-from .abstractions.stop_condition import StopCondition, TrainingContext, Score
 from ..modeling.abstractions.model import Model, TInput, TTarget
-from .abstractions.training_service import TrainingService
+from .abstractions.training_service import DATASET, TRAINING_DATASET, TrainingService
 from ..evaluation.abstractions.evaluation_metric import EvaluationContext, EvaluationMetric
 from ..evaluation.default_evaluation_service import DefaultEvaluationService
 
 from .abstractions.batch_training_plugin import *
 
 nest_asyncio.apply()
+
+def is_batch(val: List[object]) -> TypeGuard[Tuple]:
+    return all(isinstance(x, Tuple) for x in val)
+
+def is_dataset(val: List[object]) -> TypeGuard[DATASET]:
+    return all(is_batch(x) for x in val)
+
+def is_list_dataset(val: List[object]) -> TypeGuard[List[DATASET]]:
+    return all(is_dataset(x) for x in val)
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, logger: Optional[Logger]=None, evaluation_service: Optional[EvaluationService[TInput, TTarget, TModel]] = None, 
@@ -115,74 +123,51 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_train(logger, context)
 
-    def __is_any_stop_condition_satisfied(self, training_context: TrainingContext[TInput, TTarget, TModel], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], logger: Optional[Logger] = None) -> bool:
-        if logger is None:
-            logger = self.__logger
-        
-        self.__logger.info("Checking stop conditions...")
-        is_any_satisfied: bool = False
+    def __has_max_number_of_epochs_been_reached(self, training_context: TrainingContext[TInput, TTarget, TModel]) -> bool:
+        return training_context.current_epoch >= self.__max_epochs
 
-        if training_context.current_epoch >= self.__max_epochs: 
-            self.__logger.info("Max number of epochs reached.")
-            is_any_satisfied = True
+    @overload
+    async def train(self, model: TModel, dataset: DATASET, logger: Optional[Logger] = None) -> TModel: ...
+    @overload
+    async def train(self, model: TModel, dataset: Tuple[str, DATASET], logger: Optional[Logger] = None) -> TModel: ...
+    @overload
+    async def train(self, model: TModel, dataset: Iterable[DATASET], logger: Optional[Logger] = None) -> TModel: ...
+    @overload
+    async def train(self, model: TModel, dataset: Dict[str, DATASET], logger: Optional[Logger] = None) -> TModel: ...
+
+    async def train(self, model: TModel, dataset: TRAINING_DATASET,  logger: Optional[Logger] = None) -> TModel:
+        if isinstance(dataset, dict):
+            return await self.__train_on_multiple_datasets(model=model, datasets=dataset, logger=logger)
+        elif is_list_dataset(dataset):
+            evaluation_datasets_with_names: Dict[str, DATASET] = {f'dataset_{index}': dataset for index, dataset in enumerate(dataset)}
+
+            return await self.__train_on_multiple_datasets(model=model, datasets=evaluation_datasets_with_names, logger=logger)
+        elif isinstance(dataset, tuple):
+            return await self.__train_on_multiple_datasets(model=model, datasets={dataset[0]: dataset[1]}, logger=logger)
         else:
-            for key, condition in stop_conditions.items():
-                is_any_satisfied |= condition.is_satisfied(training_context)
+            return await self.__train_on_multiple_datasets(model=model, datasets={'dataset', dataset}, logger=logger)
 
-                if(is_any_satisfied):
-                    self.__logger.info('Condition named "{key}" is satisfied'.format(key=key))
-                    break
-
-        self.__logger.info("Finished checking stop conditions.")
-        return is_any_satisfied
-
-    async def train(self, model: TModel, dataset: Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None, logger: Optional[Logger] = None) -> TModel:
+    async def __train(self, model: TModel, training_dataset: TRAINING_DATASET,  logger: Optional[Logger] = None) -> TModel:
         logger = logger if not logger is None else self.__logger
         
         if model is None:
             raise ValueError("model")
 
-        if dataset is None:
+        if training_dataset is None:
             raise ValueError("dataset")
 
-        if stop_conditions is None:
-            raise ValueError("stop_conditions")
-
-        if evaluation_metrics is None:
-            raise ValueError("objective_functions can't be empty")
-
-        if primary_objective is None:
-            primary_objective = list(evaluation_metrics.keys())[0]
-
-        current_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]] = None
         training_context: TrainingContext[TInput, TTarget, TModel] = None
-        training_dataset: Tuple[str, Dataset[Tuple[TInput, TTarget]]] = None
 
-        if isinstance(dataset, Tuple):
-            current_dataset = dataset
-        else:
-            current_dataset = (type(dataset).__name__, dataset)
+        dataset: DATASET = training_dataset[1]
+        dataset_name: str = training_dataset[0]
 
-        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=current_dataset[0], scores={}, train_losses=deque([], self.__max_losses), _primary_objective=primary_objective, current_epoch=0, current_batch_index=0)
-
-        training_size: int = int(len(current_dataset[1]) * self.__training_dataset_size_ratio)
-        validation_size: int = int(len(current_dataset[1]) - training_size)
-
-        if validation_dataset is None: 
-            training_split, validation_split = random_split(current_dataset[1], [training_size, validation_size])
-
-            training_dataset = (current_dataset[0], training_split)
-            validation_dataset = (current_dataset[0], validation_split)
-        else:
-            training_dataset = current_dataset
+        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), current_epoch=0, current_batch_index=0, continue_training=True)
 
         logger.info('Starting training loop...')
 
         self.__execute_pre_loop_plugins(logger, training_context)
 
-        training_data_loader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=training_dataset[1], batch_size=self.__batch_size, drop_last=self.__drop_last)
-        
-        while not self.__is_any_stop_condition_satisfied(training_context=training_context, stop_conditions=stop_conditions):
+        while training_context.continue_training and not self.__has_max_number_of_epochs_been_reached(training_context=training_context):
             logger.info("Starting epoch...")
             epoch_start_time: float = time.time()
             training_context.current_epoch += 1
@@ -201,7 +186,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
             batch_load_start_time = time.time()
 
-            for batch_index, batch in enumerate(tqdm(training_data_loader, miniters=len(training_dataset[1])/100, initial=training_context.current_batch_index)):
+            for batch_index, batch in enumerate(tqdm(dataset, miniters=len(dataset)/100, initial=training_context.current_batch_index)):
                 training_context.current_batch_index = batch_index
 
                 iteration_start_time = time.time()
@@ -234,16 +219,6 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times if count_batch_load_times > 0 else sum_batch_load_time} seconds.")
             logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times if count_iteration_run_times > 0 else sum_iteration_run_time} seconds.")
 
-            logger.info("Evaluating current model.")
-            evaluation_scores: Dict[str, Score] = await self.__evaluation_service.evaluate(model=model, evaluation_dataset=validation_dataset, evaluation_metrics=evaluation_metrics)
-            logger.info("finished evaluating current model.")
-
-            for key, evaluation_score in evaluation_scores.items():
-                if not key in training_context.scores:
-                    training_context.scores[key] = deque([], self.__max_scores)
-                    
-                training_context.scores[key].append(evaluation_score)
-
             self.__execute_post_epoch_plugins(logger, training_context)
 
             logger.info("Finished epoch.")
@@ -255,27 +230,30 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         return model
 
-    async def train_on_multiple_datasets(self, model: TModel, datasets: Dict[str, Dataset[Tuple[TInput, TTarget]]], stop_conditions: Dict[str, StopCondition[TInput, TTarget, TModel]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], primary_objective: Optional[str] = None, validation_dataset: Optional[Union[Tuple[str, Dataset[Tuple[TInput, TTarget]]], Dataset[Tuple[TInput, TTarget]]]] = None) -> TModel:
-        self.__logger.info(f"Starting training on {len(datasets)} datasets...")
+    async def __train_on_multiple_datasets(self, model: TModel, datasets: Dict[str, DATASET], logger: Optional[Logger] = None) -> TModel:
+        if logger == None:
+            logger = self.__logger
+
+        logger.info(f"Starting training on {len(datasets)} datasets...")
 
         context: MultiTrainingContext = MultiTrainingContext(current_dataset_index=0)
 
-        self.__execute_pre_multi_loop_plugins(self.__logger, context)
+        self.__execute_pre_multi_loop_plugins(logger, context)
 
         for dataset_index in range(context.current_dataset_index, len(datasets.items())):
             context.current_dataset_index = dataset_index
 
-            self.__execute_pre_multi_train_step_plugins(self.__logger, context)
+            self.__execute_pre_multi_train_step_plugins(logger, context)
 
             dataset_name, dataset = list(datasets.items())[dataset_index]
 
-            training_run_logger: Logger = self.__logger.getChild(dataset_name)
-            model = await self.train(model, (dataset_name, dataset), stop_conditions, evaluation_metrics, primary_objective, validation_dataset, training_run_logger)
+            training_run_logger: Logger = logger.getChild(dataset_name)
+            model = await self.__train(model, (dataset_name, dataset), training_run_logger)
 
-            self.__execute_post_multi_train_step_plugins(self.__logger, context)
+            self.__execute_post_multi_train_step_plugins(logger, context)
 
-        self.__logger.info(f"Finished training on {len(datasets.items())} datasets.")
+        logger.info(f"Finished training on {len(datasets.items())} datasets.")
 
-        self.__execute_post_multi_loop_plugins(self.__logger, context)
+        self.__execute_post_multi_loop_plugins(logger, context)
 
         return model

@@ -31,6 +31,8 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
         self.dataset.__len__ = Mock(return_value=self.samples.__len__())
 
+        self.dataloader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=self.dataset, batch_size=2, drop_last=True)
+
         self.event_loop = asyncio.get_event_loop()
 
     def tearDown(self):
@@ -39,18 +41,16 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
     def test_train_valid_objectives_and_dataset_should_return_trained_model(self):
         training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]]()
 
-        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, ("test", self.dataset), {}, 
-                    {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None)
+        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, ("test", self.dataloader), None)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
 
     def test_train_on_multiple_datasets_valid_objectives_and_datasets_should_return_trained_model(self):
         training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]]()
 
-        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
+        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
-        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train_on_multiple_datasets(self.model, datasets, {},
-            {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None)
+        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, datasets)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
 
@@ -82,10 +82,9 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
 
         training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](plugins=plugins)
 
-        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
+        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
-        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train_on_multiple_datasets(self.model, datasets, {},
-            {'objective 1': self.objective_function_1, 'objective 2': self.objective_function_2}, None)
+        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, datasets, None)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
 

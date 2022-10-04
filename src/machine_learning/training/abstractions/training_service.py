@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 import asyncio
 from logging import Logger
 from optparse import Option
-from typing import Optional, TypeVar, List, Generic, Dict, Tuple, Union, overload, Sequence
+from typing import Optional, TypeVar, List, Generic, Dict, Tuple, Union, overload, Iterable
 from uuid import UUID
 from torch.utils.data.dataset import Dataset
 
-from ...modeling.abstractions.model import TInput, TTarget
-from ...evaluation.abstractions.evaluation_metric import *
-from .stop_condition import TModel, StopCondition, TrainingContext
+from ...modeling.abstractions.model import TInput, TTarget, Model
+
+TModel = TypeVar('TModel', bound=Model)
 
 DATASET = Iterable[Iterable[Tuple[TInput, TTarget]]]
 TRAINING_DATASET = Union[Tuple[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], Iterable[Iterable[Tuple[TInput, TTarget]]], Iterable[DATASET], Dict[str, DATASET]]
