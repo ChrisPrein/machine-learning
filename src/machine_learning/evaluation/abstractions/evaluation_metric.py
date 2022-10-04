@@ -11,11 +11,11 @@ class EvaluationMetric(Generic[TInput, TTarget], ABC):
     def reset(self): ...
 
     @abstractmethod
-    def update(self, batch: List[Prediction[TInput, TTarget]]): ...
+    def update(self, batch: Iterable[Prediction[TInput, TTarget]]): ...
 
     @property
     @abstractmethod
     def score(self) -> float: ...
 
-    def __call__(self, batch: List[Prediction[TInput, TTarget]]):
+    def __call__(self, batch: Iterable[Prediction[TInput, TTarget]]):
         return self.update(batch)

@@ -1,10 +1,6 @@
-from asyncio import coroutine
 import asyncio
-from dataclasses import dataclass
-from re import S
 import unittest
-from unittest.mock import MagicMock, Mock, patch
-from torch import isin
+from unittest.mock import MagicMock, Mock
 from torch.utils.data import Dataset
 from dataset_handling.dataloader import DataLoader
 from typing import Any, Coroutine, List, Dict, Tuple
@@ -46,7 +42,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         pass
 
     def test_evaluate_valid_model_metrics_and_dataset_should_return_results_for_each_metric(self):
-        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+        evaluation_service: EvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.dataloader, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
@@ -60,7 +56,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
 
         datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
-        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
+        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate(self.model, datasets, 
             {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, Dict[str, float]] = self.event_loop.run_until_complete(evaluation_routine)
@@ -93,7 +89,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
 
         datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
-        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
+        evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate(self.model, datasets, 
             {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, Dict[str, float]] = self.event_loop.run_until_complete(evaluation_routine)

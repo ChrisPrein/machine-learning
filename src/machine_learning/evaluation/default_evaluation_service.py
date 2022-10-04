@@ -7,7 +7,7 @@ from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import Model, TInput, TTarget
 from .abstractions.evaluation_metric import *
 from .abstractions.multi_metric import *
-from .abstractions.evaluation_service import EvaluationService, Score
+from .abstractions.evaluation_service import DATASET, EVALUATION_DATASET, EVALUATION_METRICS, EvaluationService, Score
 from ..operators.true_division import *
 import asyncio
 import asyncio.tasks
@@ -17,6 +17,15 @@ from tqdm import tqdm
 import nest_asyncio
 
 nest_asyncio.apply()
+
+def is_batch(val: List[object]) -> TypeGuard[Tuple]:
+    return all(isinstance(x, Tuple) for x in val)
+
+def is_dataset(val: List[object]) -> TypeGuard[DATASET]:
+    return all(is_batch(x) for x in val)
+
+def is_list_dataset(val: List[object]) -> TypeGuard[List[DATASET]]:
+    return all(is_dataset(x) for x in val)
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     def __init__(self, logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
@@ -100,7 +109,28 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
 
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]:
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Tuple[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Dict[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Iterable[DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+
+    async def evaluate(self, model: TModel, evaluation_dataset: EVALUATION_DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]:
+        if isinstance(evaluation_dataset, dict):
+            return await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_dataset, evaluation_metrics=evaluation_metrics, logger=logger)
+        elif is_list_dataset(evaluation_dataset):
+            evaluation_datasets_with_names: Dict[str, DATASET] = {f'dataset_{index}': dataset for index, dataset in enumerate(evaluation_dataset)}
+
+            return await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets_with_names, evaluation_metrics=evaluation_metrics, logger=logger)
+        elif isinstance(evaluation_dataset, tuple):
+            return await self.__evaluate(model=model, evaluation_dataset=evaluation_dataset, evaluation_metrics=evaluation_metrics, logger=logger)
+        else:
+            return await self.__evaluate(model=model, evaluation_dataset=('dataset', evaluation_dataset), evaluation_metrics=evaluation_metrics, logger=logger)
+
+    async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
             logger = self.__logger
         
@@ -113,15 +143,8 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         if evaluation_metrics is None:
             raise ValueError("evaluation_metrics")
 
-        dataset: Iterable[Iterable[Tuple[TInput, TTarget]]] = None
-        dataset_name: str = None
-
-        if isinstance(evaluation_dataset, Tuple):
-            dataset = evaluation_dataset[1]
-            dataset_name = evaluation_dataset[0]
-        else:
-            dataset = evaluation_dataset
-            dataset_name = type(dataset).__name__
+        dataset: DATASET = evaluation_dataset[1]
+        dataset_name: str = evaluation_dataset[0]
 
         evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
 
@@ -192,27 +215,30 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         
         return result
 
-    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]:
-        self.__logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
+    async def __evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Dict[str, Score]]:
+        if logger == None:
+            logger = self.__logger
+
+        logger.info(f"starting evaluation on {len(evaluation_datasets)} datasets...")
 
         context: MultiEvaluationContext = MultiEvaluationContext(current_dataset_index=0, scores={})
 
-        self.__execute_pre_multi_loop_plugins(self.__logger, context)
+        self.__execute_pre_multi_loop_plugins(logger, context)
 
         for dataset_index in range(context.current_dataset_index, len(evaluation_datasets)):
             context.current_dataset_index = dataset_index
 
-            self.__execute_pre_multi_evaluation_step_plugins(self.__logger, context)
+            self.__execute_pre_multi_evaluation_step_plugins(logger, context)
 
             dataset_name, dataset = list(evaluation_datasets.items())[dataset_index]
 
-            evaluation_logger: Logger = self.__logger.getChild(dataset_name)
-            context.scores[dataset_name] = await self.evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
+            evaluation_logger: Logger = logger.getChild(dataset_name)
+            context.scores[dataset_name] = await self.__evaluate(model, (dataset_name, dataset), evaluation_metrics, evaluation_logger)
 
-            self.__execute_post_multi_evaluation_step_plugins(self.__logger, context)
+            self.__execute_post_multi_evaluation_step_plugins(logger, context)
 
-        self.__logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
+        logger.info(f"finished evaluation on {len(evaluation_datasets)} datasets.")
 
-        self.__execute_post_multi_loop_plugins(self.__logger, context)
+        self.__execute_post_multi_loop_plugins(logger, context)
 
         return context.scores

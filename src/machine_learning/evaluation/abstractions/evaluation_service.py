@@ -5,10 +5,18 @@ from ...modeling.abstractions.model import *
 from .evaluation_metric import EvaluationMetric
 from .default_evaluation_plugin import *
 
-class EvaluationService(Generic[TInput, TTarget, TModel], ABC):
-    
-    @abstractmethod
-    async def evaluate(self, model: TModel, evaluation_dataset: Union[Tuple[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+DATASET = Iterable[Iterable[Tuple[TInput, TTarget]]]
+EVALUATION_DATASET = Union[Tuple[str, DATASET], DATASET, Dict[str, DATASET], Iterable[DATASET]]
+EVALUATION_METRICS = Dict[str, EvaluationMetric[TInput, TTarget]]
 
+class EvaluationService(Generic[TInput, TTarget, TModel], ABC):
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Tuple[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Dict[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    @overload
+    async def evaluate(self, model: TModel, evaluation_dataset: Iterable[DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
     @abstractmethod
-    async def evaluate_on_multiple_datasets(self, model: TModel, evaluation_datasets: Dict[str, Iterable[Iterable[Tuple[TInput, TTarget]]]], evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]) -> Dict[str, Dict[str, Score]]: ...
+    async def evaluate(self, model: TModel, evaluation_dataset: EVALUATION_DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
