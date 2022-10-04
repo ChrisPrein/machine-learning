@@ -19,12 +19,8 @@ import nest_asyncio
 nest_asyncio.apply()
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, logger: Optional[Logger]=None, batch_size: int = 1, drop_last: bool = True, 
-    event_loop: Optional[asyncio.AbstractEventLoop] = None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
+    def __init__(self, logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
         self.__logger = logger if not logger is None else logging.getLogger()
-        self.__event_loop: asyncio.AbstractEventLoop = event_loop if not event_loop is None else asyncio.get_event_loop()
-        self.__batch_size: int = batch_size
-        self.__drop_last: bool = drop_last
         self.__max_predictions: Optional[int] = max_predictions
         self.__max_losses: Optional[int] = max_losses
 

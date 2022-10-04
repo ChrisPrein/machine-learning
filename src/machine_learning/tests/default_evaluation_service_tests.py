@@ -38,9 +38,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         self.dataset.__getitem__ = Mock(return_value=random.choice(self.samples))
         self.dataset.__len__ = Mock(return_value=self.samples.__len__())
 
-        self.predictions: Dataset[Prediction[str, str]] = Mock()
-        self.predictions.__getitem__ = Mock(return_value=random.choice(self.prediction_sample))
-        self.predictions.__len__ = Mock(return_value=self.samples.__len__())
+        self.dataloader: DataLoader[Tuple[TInput, TTarget]] = DataLoader[Tuple[TInput, TTarget]](dataset=self.dataset, batch_size=2, drop_last=True)
 
         self.event_loop = asyncio.get_event_loop()
 
@@ -50,17 +48,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
     def test_evaluate_valid_model_metrics_and_dataset_should_return_results_for_each_metric(self):
         evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
 
-        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.dataset, 
-                    {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
-
-        result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
-
-        assert len(result.items()) == 2
-
-    def test_evaluate_predictions_valid_model_metrics_and_predictions_should_return_result_for_each_metric(self):
-        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
-
-        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate_predictions(self.predictions, 
+        evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.dataloader, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
 
         result: Dict[str, float] = self.event_loop.run_until_complete(evaluation_routine)
@@ -70,7 +58,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
     def test_evaluation_on_multiple_datasets_valid_model_metrics_and_datasets_should_return_results_for_each_metric_on_each_dataset(self):
         evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
 
-        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
+        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
             {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
@@ -103,7 +91,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
 
         evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](plugins=plugins)
 
-        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataset, "set_2": self.dataset}
+        datasets: Dict[str, Dataset[Tuple[str, str]]] = {"set_1": self.dataloader, "set_2": self.dataloader}
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, Dict[str, float]]] = evaluation_service.evaluate_on_multiple_datasets(self.model, datasets, 
             {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
