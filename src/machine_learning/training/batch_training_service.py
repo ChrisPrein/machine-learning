@@ -13,6 +13,7 @@ from tqdm import tqdm
 import time
 
 from machine_learning.training.abstractions.batch_training_plugin import BatchTrainingPlugin, PostEpoch, PostLoop, PostMultiLoop, PostTrain, PreEpoch, PreLoop, PreMultiLoop, PreTrain
+from custom_operators.operators.true_division import *
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
 from ..modeling.abstractions.model import Model, TInput, TTarget
@@ -216,8 +217,8 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
                 batch_load_start_time = time.time()
 
-            logger.info(f"Each batch load took around {sum_batch_load_time/count_batch_load_times if count_batch_load_times > 0 else sum_batch_load_time} seconds.")
-            logger.info(f"Each iteration took around {sum_iteration_run_time/count_iteration_run_times if count_iteration_run_times > 0 else sum_iteration_run_time} seconds.")
+            logger.info(f"Each batch load took around {sum_batch_load_time/allow_zero/count_batch_load_times} seconds.")
+            logger.info(f"Each iteration took around {sum_iteration_run_time/allow_zero/count_iteration_run_times} seconds.")
 
             self.__execute_post_epoch_plugins(logger, training_context)
 
