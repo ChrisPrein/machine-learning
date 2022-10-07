@@ -6,19 +6,17 @@ from typing import List, Optional, Dict, Tuple, Union
 import asyncio
 import asyncio.tasks
 import asyncio.futures
-from dataset_handling.dataloader import DataLoader
-from torch.utils.data import Dataset, random_split
 import nest_asyncio
 from tqdm import tqdm
 import time
 
-from machine_learning.training.abstractions.batch_training_plugin import BatchTrainingPlugin, PostEpoch, PostLoop, PostMultiLoop, PostTrain, PreEpoch, PreLoop, PreMultiLoop, PreTrain
+from .abstractions.batch_training_plugin import *
 from custom_operators.operators.true_division import *
 
 from ..evaluation.abstractions.evaluation_service import EvaluationService
-from ..modeling.abstractions.model import Model, TInput, TTarget
+from ..modeling.abstractions.model import TInput, TTarget
 from .abstractions.training_service import DATASET, TRAINING_DATASET, TrainingService
-from ..evaluation.abstractions.evaluation_metric import EvaluationContext, EvaluationMetric
+from ..evaluation.abstractions.evaluation_metric import EvaluationContext
 from ..evaluation.default_evaluation_service import DefaultEvaluationService
 
 from .abstractions.batch_training_plugin import *
@@ -146,7 +144,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         elif isinstance(dataset, tuple):
             return await self.__train_on_multiple_datasets(model=model, datasets={dataset[0]: dataset[1]}, logger=logger)
         else:
-            return await self.__train_on_multiple_datasets(model=model, datasets={'dataset', dataset}, logger=logger)
+            return await self.__train_on_multiple_datasets(model=model, datasets={'dataset': dataset}, logger=logger)
 
     async def __train(self, model: TModel, training_dataset: TRAINING_DATASET,  logger: Optional[Logger] = None) -> TModel:
         logger = logger if not logger is None else self.__logger

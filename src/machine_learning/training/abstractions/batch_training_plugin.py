@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
 from typing import Dict, Generic, List, Tuple, Deque, Union
-from torch.utils.data import Dataset, random_split
 
 from ...evaluation.abstractions.evaluation_service import Score
 

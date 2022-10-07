@@ -4,7 +4,6 @@ from logging import Logger
 from optparse import Option
 from typing import Optional, TypeVar, List, Generic, Dict, Tuple, Union, overload, Iterable
 from uuid import UUID
-from torch.utils.data.dataset import Dataset
 
 from ...modeling.abstractions.model import TInput, TTarget, Model
 

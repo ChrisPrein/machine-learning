@@ -7,7 +7,7 @@ from ..evaluation.abstractions.default_evaluation_plugin import *
 from ..modeling.abstractions.model import TInput, TTarget
 from .abstractions.evaluation_metric import *
 from .abstractions.multi_metric import *
-from .abstractions.evaluation_service import DATASET, EVALUATION_DATASET, EVALUATION_METRICS, EvaluationService, Score
+from .abstractions.evaluation_service import DATASET, EVALUATION_DATASET, EVALUATION_METRICS, EVALUATION_RESULT, EvaluationService, Score
 import asyncio.tasks
 import asyncio.futures
 from custom_operators.operators.true_division import *
@@ -112,11 +112,11 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
     @overload
     async def evaluate(self, model: TModel, evaluation_dataset: Tuple[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
     @overload
-    async def evaluate(self, model: TModel, evaluation_dataset: Dict[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    async def evaluate(self, model: TModel, evaluation_dataset: Dict[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Dict[str, Score]]: ...
     @overload
-    async def evaluate(self, model: TModel, evaluation_dataset: Iterable[DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]: ...
+    async def evaluate(self, model: TModel, evaluation_dataset: Iterable[DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Dict[str, Score]]: ...
 
-    async def evaluate(self, model: TModel, evaluation_dataset: EVALUATION_DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]:
+    async def evaluate(self, model: TModel, evaluation_dataset: EVALUATION_DATASET, evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> EVALUATION_RESULT:
         if isinstance(evaluation_dataset, dict):
             return await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_dataset, evaluation_metrics=evaluation_metrics, logger=logger)
         elif is_list_dataset(evaluation_dataset):
@@ -124,9 +124,9 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             return await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets=evaluation_datasets_with_names, evaluation_metrics=evaluation_metrics, logger=logger)
         elif isinstance(evaluation_dataset, tuple):
-            return await self.__evaluate(model=model, evaluation_dataset=evaluation_dataset, evaluation_metrics=evaluation_metrics, logger=logger)
+            return list((await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets={evaluation_dataset[0]: evaluation_dataset[1]}, evaluation_metrics=evaluation_metrics, logger=logger)).values())[0]
         else:
-            return await self.__evaluate(model=model, evaluation_dataset=('dataset', evaluation_dataset), evaluation_metrics=evaluation_metrics, logger=logger)
+            return list((await self.__evaluate_on_multiple_datasets(model=model, evaluation_datasets={'dataset': evaluation_dataset}, evaluation_metrics=evaluation_metrics, logger=logger)).values())[0]
 
     async def __evaluate(self, model: TModel, evaluation_dataset: Tuple[str, DATASET], evaluation_metrics: EVALUATION_METRICS, logger: Optional[Logger] = None) -> Dict[str, Score]:
         if logger is None:
