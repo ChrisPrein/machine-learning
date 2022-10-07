@@ -13,7 +13,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):
         fake = Faker()
 
-        self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(10)]
+        self.samples: List[Tuple[str, str]] = [(fake.first_name(), fake.last_name()) for i in range(100)]
 
         self.prediction_sample: List[Prediction[str, str]] = [Prediction[str, str](fake.first_name(), fake.last_name(), fake.last_name()) for i in range(10)]
 

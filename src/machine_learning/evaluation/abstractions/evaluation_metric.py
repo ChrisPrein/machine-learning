@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, List, Generic, Union
-from dataclasses import dataclass
+from typing import Generic
 
-from ...modeling.abstractions.model import Model, TInput, TTarget
+from ...modeling.abstractions.model import TInput, TTarget
 from ..contexts.evaluation_context import *
 
 class EvaluationMetric(Generic[TInput, TTarget], ABC):
