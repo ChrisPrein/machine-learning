@@ -40,24 +40,7 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
 
-    def test_train_on_multiple_datasets_valid_objectives_and_datasets_should_return_trained_model(self):
-        training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]]()
-
-        datasets: Dict[str, Iterable[Iterable[Tuple[str, str]]]] = {"set_1": self.data, "set_2": self.data}
-
-        training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, datasets)
-
-        trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
-
-    def test_train_on_multiple_datasets_valid_objectives_and_datasets_should_call_plugin_methods(self):
-        pre_multi_loop: PreMultiLoop[str, str, Model[str, str]] = MagicMock(spec=PreMultiLoop)
-        pre_multi_loop.pre_multi_loop = Mock()
-        post_multi_loop: PostMultiLoop[str, str, Model[str, str]] = MagicMock(spec=PostMultiLoop)
-        post_multi_loop.post_multi_loop = Mock()
-        pre_multi_train_step: PreMultiTrainStep[str, str, Model[str, str]] = MagicMock(spec=PreMultiTrainStep)
-        pre_multi_train_step.pre_multi_train_step = Mock()
-        post_multi_train_step: PostMultiTrainStep[str, str, Model[str, str]] = MagicMock(spec=PostMultiTrainStep)
-        post_multi_train_step.post_multi_train_step = Mock()
+    def test_train_valid_objectives_and_datasets_should_call_plugin_methods(self):
         pre_loop: PreLoop[str, str, Model[str, str]] = MagicMock(spec=PreLoop)
         pre_loop.pre_loop = Mock()
         post_loop: PostLoop[str, str, Model[str, str]] = MagicMock(spec=PostLoop)
@@ -71,22 +54,17 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         post_train_step: PostTrain[str, str, Model[str, str]] = MagicMock(spec=PostTrain)
         post_train_step.post_train = Mock()
 
-        plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {'pre_multi_loop': pre_multi_loop, 'post_multi_loop': post_multi_loop, 
-        'pre_multi_train_step': pre_multi_train_step, 'post_multi_train_step': post_multi_train_step, 'pre_loop': pre_loop, 'post_loop': post_loop,
+        plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {'pre_loop': pre_loop, 'post_loop': post_loop,
         'pre_epoch': pre_epoch, 'post_epoch': post_epoch, 'pre_train_step': pre_train_step, 'post_train_step': post_train_step}
 
         training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](plugins=plugins)
 
-        datasets: Dict[str, Iterable[Iterable[Tuple[str, str]]]] = {"set_1": self.data, "set_2": self.data}
+        datasets: Tuple[str, Iterable[Iterable[Tuple[str, str]]]] = ("set_1", self.data)
 
         training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, datasets, None)
 
         trained_model: Model[str, str] = self.event_loop.run_until_complete(training_routine)
 
-        pre_multi_loop.pre_multi_loop.assert_called()
-        post_multi_loop.post_multi_loop.assert_called()
-        pre_multi_train_step.pre_multi_train_step.assert_called()
-        post_multi_train_step.post_multi_train_step.assert_called()
         pre_loop.pre_loop.assert_called()
         post_loop.post_loop.assert_called()
         pre_epoch.pre_epoch.assert_called()
