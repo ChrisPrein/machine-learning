@@ -19,6 +19,8 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
         self.model.training_step = Mock(return_value=fake.pyfloat(positive=True))
 
+        self.trainer = Mock(return_value=([prediction[1] for prediction in self.samples], 1.0))
+
         self.objective_function_1: EvaluationMetric[str, str] = MagicMock(spec=EvaluationMetric)
         self.objective_function_1.score = Mock(return_value=fake.pyfloat(positive=True))
 
@@ -33,7 +35,7 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         pass
 
     def test_train_valid_objectives_and_dataset_should_return_trained_model(self):
-        training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]]()
+        training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](self.trainer)
 
         training_routine: Coroutine[Any, Any, Model[str, str]] = training_service.train(self.model, ("test", self.data), None)
 
@@ -56,7 +58,7 @@ class BatchTrainingServiceTestCase(unittest.TestCase):
         plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {'pre_loop': pre_loop, 'post_loop': post_loop,
         'pre_epoch': pre_epoch, 'post_epoch': post_epoch, 'pre_train_step': pre_train_step, 'post_train_step': post_train_step}
 
-        training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](plugins=plugins)
+        training_service: BatchTrainingService[str, str, Model[str, str]] = BatchTrainingService[str, str, Model[str, str]](trainer=self.trainer, plugins=plugins)
 
         datasets: Tuple[str, Iterable[Iterable[Tuple[str, str]]]] = ("set_1", self.data)
 

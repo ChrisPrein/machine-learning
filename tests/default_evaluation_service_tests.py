@@ -19,6 +19,8 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
 
         self.model: Model[str, str] = MagicMock(spec=Model)
 
+        self.evaluator = Mock(return_value=([prediction.target for prediction in self.prediction_sample], 1.0))
+
         self.model.predict_step = Mock(return_value=[fake.last_name() for i in range(10)])
         self.model.evaluation_step = Mock(return_value=([fake.last_name() for i in range(10)], fake.pyfloat(positive=True)))
 
@@ -36,7 +38,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         pass
 
     def test_evaluate_valid_model_metrics_and_dataset_should_return_results_for_each_metric(self):
-        evaluation_service: EvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+        evaluation_service: EvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](self.evaluator)
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate(self.model, self.data, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
@@ -46,7 +48,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         assert len(result.items()) == 2
 
     def test_evaluation_on_multiple_datasets_valid_model_metrics_and_datasets_should_return_results_for_each_metric_on_each_dataset(self):
-        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](self.evaluator)
 
         datasets: Dict[str, Iterable[Iterable[Tuple[str, str]]]] = {"set_1": self.data, "set_2": self.data}
 
@@ -79,7 +81,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         'pre_multi_train_step': pre_multi_evaluation_step, 'post_multi_train_step': post_multi_evaluation_step, 'pre_loop': pre_loop, 'post_loop': post_loop,
         'pre_train_step': pre_evaluation_step, 'post_train_step': post_evaluation_step}
 
-        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](plugins=plugins)
+        evaluation_service: DefaultEvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](self.evaluator, plugins=plugins)
 
         datasets: Dict[str, Iterable[Iterable[Tuple[str, str]]]] = {"set_1": self.data, "set_2": self.data}
 
@@ -98,7 +100,7 @@ class DefaultEvaluationServiceTestCase(unittest.TestCase):
         post_evaluation_step.post_evaluation_step.assert_called()
 
     def test_evaluate_predictions_should_return_results_for_each_metric(self):
-        evaluation_service: EvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]]()
+        evaluation_service: EvaluationService[str, str, Model[str, str]] = DefaultEvaluationService[str, str, Model[str, str]](self.evaluator)
 
         evaluation_routine: Coroutine[Any, Any, Dict[str, float]] = evaluation_service.evaluate_predictions(self.prediction_sample, 
                     {'metric 1': self.evaluation_metric_1, 'metric 2': self.evaluation_metric_2})
