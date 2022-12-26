@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, Mock
 from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
-from src.machine_learning.evaluation.abstractions.evaluation_metric import EvaluationMetric
-from src.machine_learning.modeling.abstractions.model import Model, TInput, TTarget
+from src.machine_learning.evaluation.evaluation_metric import EvaluationMetric
+from src.machine_learning.modeling.model import Model, TInput, TTarget
 from src.machine_learning.evaluation.default_evaluation_service import *
-from src.machine_learning.evaluation.abstractions.default_evaluation_plugin import *
+from src.machine_learning.evaluation.default_evaluation_plugin import *
 
 class DefaultEvaluationServiceTestCase(unittest.TestCase):
     def setUp(self):

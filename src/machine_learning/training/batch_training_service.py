@@ -1,18 +1,56 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import deque
+from dataclasses import dataclass
 from logging import Logger
 import logging
-from typing import List, Optional, Dict, Tuple, Union
-import nest_asyncio
+from typing import Deque, Generic, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
 from tqdm import tqdm
 import time
-from .abstractions.batch_training_plugin import *
 from custom_operators.operators.true_division import *
-from ..modeling.abstractions.model import TInput, TTarget
-from .abstractions.training_service import DATASET, TRAINING_DATASET, TrainingService
-from .abstractions.batch_training_plugin import *
+from ..modeling.model import TInput, TTarget
+from .training_service import DATASET, TRAINING_DATASET, TModel, TrainingService
 
-nest_asyncio.apply()
+@dataclass
+class TrainingContext(Generic[TInput, TTarget, TModel]):
+    model: TModel
+    dataset_name: str
+    current_epoch: int
+    current_batch_index: int
+    train_losses: Deque[Union[float, Dict[str, float]]]
+    continue_training: bool
+
+class BatchTrainingPlugin(Generic[TInput, TTarget, TModel], ABC):
+    pass
+
+class PreLoop(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def pre_loop(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
+
+class PostLoop(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def post_loop(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
+
+class PreEpoch(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def pre_epoch(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
+
+class PostEpoch(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def post_epoch(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
+
+class PreTrain(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def pre_train(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
+
+class PostTrain(BatchTrainingPlugin[TInput, TTarget, TModel]):
+    @abstractmethod
+    def post_train(self, logger: Logger, trainingContext: TrainingContext[TInput, TTarget, TModel]):
+        pass
 
 def is_batch(val: List[object]) -> TypeGuard[Tuple]:
     return all(isinstance(x, Tuple) for x in val)

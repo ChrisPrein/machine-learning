@@ -5,10 +5,9 @@ from typing import Any, Coroutine, List, Dict, Tuple
 from faker import Faker
 import random
 
-from src.machine_learning.modeling.abstractions.model import *
+from src.machine_learning.modeling.model import *
 from src.machine_learning.training.batch_training_service import *
-from src.machine_learning.training.abstractions.batch_training_plugin import *
-from src.machine_learning.evaluation.abstractions.evaluation_metric import *
+from src.machine_learning.evaluation.evaluation_metric import *
 
 class BatchTrainingServiceTestCase(unittest.TestCase):
     def setUp(self):
