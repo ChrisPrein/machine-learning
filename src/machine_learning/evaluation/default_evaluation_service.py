@@ -1,8 +1,10 @@
 from collections import deque
 from logging import Logger
 import logging
-from typing import Iterable, List, Optional, Dict, Tuple, TypeGuard, Union, overload
+from typing import Callable, Iterable, List, Optional, Dict, Tuple, TypeGuard, Union, overload
 import time
+
+from .evaluator import EVALUATOR_RESULT, INPUT, TARGET, Evaluator
 from .multi_metric import MultiMetric
 from .evaluation_metric import EvaluationMetric
 from .multi_evaluation_context import MultiEvaluationContext, Score
@@ -26,8 +28,16 @@ def is_list_dataset(val: List[object]) -> TypeGuard[List[DATASET]]:
     return all(is_dataset(x) for x in val)
 
 class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
-    def __init__(self, logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
+    def __init__(self, 
+        evaluator: Callable[[TModel, INPUT, TARGET, Logger], EVALUATOR_RESULT],
+        logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, 
+        max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
+
+        if evaluator == None:
+            raise TypeError("evaluator")
+
         self.__logger = logger if not logger is None else logging.getLogger()
+        self.__evaluator: Callable[[TModel, INPUT, TARGET, Logger], EVALUATOR_RESULT] = evaluator
         self.__max_predictions: Optional[int] = max_predictions
         self.__max_losses: Optional[int] = max_losses
 
@@ -88,10 +98,10 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_evaluation_step(logger, context)
 
-    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]]) -> Tuple[List[Prediction], Union[float, Dict[str, float]]]:
+    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]], logger: Logger) -> Tuple[List[Prediction], Union[float, Dict[str, float]]]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TTarget] = [sample[1] for sample in batch]
-        predictions, loss = model.evaluation_step(inputs, targets)
+        predictions, loss = self.__evaluator(model, inputs, targets, logger)
 
         combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
 
@@ -188,7 +198,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
 
             self.__execute_pre_evaluation_step_plugins(logger, evaluation_context)
             
-            predictions, loss = self.__predict_batch(evaluation_context, model, batch)
+            predictions, loss = self.__predict_batch(evaluation_context, model, batch, logger)
 
             evaluation_context.predictions.extend(predictions)
             evaluation_context.losses.append(loss)

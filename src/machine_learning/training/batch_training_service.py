@@ -3,10 +3,13 @@ from collections import deque
 from dataclasses import dataclass
 from logging import Logger
 import logging
-from typing import Deque, Generic, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
+from typing import Callable, Deque, Generic, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
 from tqdm import tqdm
 import time
 from custom_operators.operators.true_division import *
+
+from ..evaluation.evaluation_context import Prediction
+from .trainer import INPUT, TARGET, TRAINER_RESULT, Trainer
 from ..modeling.model import TInput, TTarget
 from .training_service import DATASET, TRAINING_DATASET, TModel, TrainingService
 
@@ -16,6 +19,7 @@ class TrainingContext(Generic[TInput, TTarget, TModel]):
     dataset_name: str
     current_epoch: int
     current_batch_index: int
+    predictions: Deque[Prediction[TInput, TTarget]]
     train_losses: Deque[Union[float, Dict[str, float]]]
     continue_training: bool
 
@@ -62,17 +66,23 @@ def is_list_dataset(val: List[object]) -> TypeGuard[List[DATASET]]:
     return all(is_dataset(x) for x in val)
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
-    def __init__(self, logger: Optional[Logger]=None,
+    def __init__(self, 
+        trainer: Callable[[TModel, INPUT, TARGET, Logger], TRAINER_RESULT], 
+        logger: Optional[Logger]=None,
         max_epochs: int = 100, 
         max_losses: Optional[int] = None, 
+        max_predictions: Optional[int] = None, 
         plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel]] = {}, 
         **kwargs):
+
+        if trainer == None:
+            raise TypeError('trainer')
         
         self.__logger = logger if not logger is None else logging.getLogger()
-        
+        self.__trainer: Callable[[TModel, INPUT, TARGET, Logger], TRAINER_RESULT] = trainer
         self.__max_epochs: int = max_epochs
-
         self.__max_losses: Optional[int] = max_losses
+        self.__max_predictions: Optional[int] = max_predictions
        
         self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
         self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
@@ -144,7 +154,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         dataset: DATASET = training_dataset[1]
         dataset_name: str = training_dataset[0]
 
-        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), current_epoch=0, current_batch_index=0, continue_training=True)
+        training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), predictions=deque([], self.__max_predictions), current_epoch=0, current_batch_index=0, continue_training=True)
 
         logger.info('Starting training loop...')
 
@@ -185,9 +195,10 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
                 targets: List[TTarget] = [value[1] for value in batch]
 
                 logger.debug("Executing training step.")
-                train_loss: Union[float, Dict[str, float]] = model.training_step(inputs, targets)
+                predictions, train_loss = self.__trainer(model, inputs, targets, logger)
                 
                 training_context.train_losses.append(train_loss)
+                training_context.predictions.extend(predictions)
 
                 self.__execute_post_train_plugins(logger, training_context)
 
