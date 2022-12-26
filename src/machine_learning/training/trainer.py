@@ -12,6 +12,9 @@ TARGET = Union[TInput, TARGET_BATCH]
 TRAINER_RESULT = Tuple[List[TTarget], Union[float, Dict[str, float]]]
 
 class Trainer(Generic[TInput, TTarget, TModel], ABC):
+    def __init__(self):
+        super().__init__()
+
     @overload
     def train_step(self, model: TModel, input: TInput, target: TTarget, logger: Optional[Logger] = None) -> TRAINER_RESULT: ...
     @overload

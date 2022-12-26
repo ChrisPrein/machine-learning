@@ -12,6 +12,9 @@ TARGET = Union[TInput, TARGET_BATCH]
 EVALUATOR_RESULT = Tuple[List[TTarget], Union[float, Dict[str, float]]]
 
 class Evaluator(Generic[TInput, TTarget, TModel], ABC):
+    def __init__(self):
+        super().__init__()
+
     @overload
     def evaluation_step(self, model: TModel, input: TInput, target: TTarget, logger: Optional[Logger] = None) -> EVALUATOR_RESULT: ...
     @overload

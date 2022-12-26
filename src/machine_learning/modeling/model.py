@@ -9,6 +9,8 @@ INPUT = Union[TInput, INPUT_BATCH]
 TARGET = Union[TTarget, TARGET_BATCH]
 
 class Model(Generic[TInput, TTarget], ABC):
+    def __init__(self):
+        super().__init__()
 
     @overload
     def predict_step(self, input: TInput) -> TTarget: ...

@@ -5,6 +5,8 @@ from ..modeling.model import TInput, TTarget
 from .evaluation_metric import EvaluationMetric
 
 class MultiMetric(Generic[TInput, TTarget], EvaluationMetric[TInput, TTarget]):
+    def __init__(self):
+        super().__init__()
 
     @property
     @abstractmethod
