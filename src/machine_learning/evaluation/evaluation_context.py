@@ -3,6 +3,8 @@ from typing import *
 
 from ..modeling.model import Model, TInput, TTarget
 
+__all__ = ['Prediction', 'EvaluationContext', 'TModel']
+
 TModel = TypeVar('TModel', bound=Model)
 
 @dataclass(frozen=True)

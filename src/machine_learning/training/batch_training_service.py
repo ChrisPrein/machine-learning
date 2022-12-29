@@ -9,9 +9,11 @@ import time
 from custom_operators.operators.true_division import *
 
 from ..evaluation.evaluation_context import Prediction
-from .trainer import INPUT, TARGET, TRAINER_RESULT, Trainer
+from .trainer import Input, Target, TrainerResult, Trainer
 from ..modeling.model import TInput, TTarget
-from .training_service import DATASET, TRAINING_DATASET, TModel, TrainingService
+from .training_service import Dataset, TrainingDataset, TModel, TrainingService
+
+__all__ = ['TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'PreEpoch', 'PostEpoch', 'PreTrain', 'PostTrain', 'BatchTrainingService']
 
 @dataclass
 class TrainingContext(Generic[TInput, TTarget, TModel]):
@@ -59,15 +61,15 @@ class PostTrain(BatchTrainingPlugin[TInput, TTarget, TModel]):
 def is_batch(val: List[object]) -> TypeGuard[Tuple]:
     return all(isinstance(x, Tuple) for x in val)
 
-def is_dataset(val: List[object]) -> TypeGuard[DATASET]:
+def is_dataset(val: List[object]) -> TypeGuard[Dataset]:
     return all(is_batch(x) for x in val)
 
-def is_list_dataset(val: List[object]) -> TypeGuard[List[DATASET]]:
+def is_list_dataset(val: List[object]) -> TypeGuard[List[Dataset]]:
     return all(is_dataset(x) for x in val)
 
 class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, 
-        trainer: Callable[[TModel, INPUT, TARGET, Logger], TRAINER_RESULT], 
+        trainer: Callable[[TModel, Input, Target, Logger], TrainerResult], 
         logger: Optional[Logger]=None,
         max_epochs: int = 100, 
         max_losses: Optional[int] = None, 
@@ -79,7 +81,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
             raise TypeError('trainer')
         
         self.__logger = logger if not logger is None else logging.getLogger()
-        self.__trainer: Callable[[TModel, INPUT, TARGET, Logger], TRAINER_RESULT] = trainer
+        self.__trainer: Callable[[TModel, Input, Target, Logger], TrainerResult] = trainer
         self.__max_epochs: int = max_epochs
         self.__max_losses: Optional[int] = max_losses
         self.__max_predictions: Optional[int] = max_predictions
@@ -131,16 +133,16 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
         return training_context.current_epoch >= self.__max_epochs
 
     @overload
-    async def train(self, model: TModel, dataset: DATASET, logger: Optional[Logger] = None) -> TModel: ...
+    async def train(self, model: TModel, dataset: Dataset, logger: Optional[Logger] = None) -> TModel: ...
     @overload
-    async def train(self, model: TModel, dataset: Tuple[str, DATASET], logger: Optional[Logger] = None) -> TModel: ...
-    async def train(self, model: TModel, dataset: TRAINING_DATASET,  logger: Optional[Logger] = None) -> TModel:
+    async def train(self, model: TModel, dataset: Tuple[str, Dataset], logger: Optional[Logger] = None) -> TModel: ...
+    async def train(self, model: TModel, dataset: TrainingDataset,  logger: Optional[Logger] = None) -> TModel:
         if isinstance(dataset, tuple):
             return await self.__train(model=model, training_dataset=dataset, logger=logger)
         else:
             return await self.__train(model=model, training_dataset=('dataset', dataset), logger=logger)
 
-    async def __train(self, model: TModel, training_dataset: Tuple[str, DATASET],  logger: Optional[Logger] = None) -> TModel:
+    async def __train(self, model: TModel, training_dataset: Tuple[str, Dataset],  logger: Optional[Logger] = None) -> TModel:
         logger = logger if not logger is None else self.__logger
         
         if model is None:
@@ -151,7 +153,7 @@ class BatchTrainingService(TrainingService[TInput, TTarget, TModel], ABC):
 
         training_context: TrainingContext[TInput, TTarget, TModel] = None
 
-        dataset: DATASET = training_dataset[1]
+        dataset: Dataset = training_dataset[1]
         dataset_name: str = training_dataset[0]
 
         training_context = TrainingContext[TInput, TTarget, TModel](model=model, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), predictions=deque([], self.__max_predictions), current_epoch=0, current_batch_index=0, continue_training=True)

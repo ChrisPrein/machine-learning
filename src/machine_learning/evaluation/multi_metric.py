@@ -4,6 +4,8 @@ from .evaluation_context import Prediction
 from ..modeling.model import TInput, TTarget
 from .evaluation_metric import EvaluationMetric
 
+__all__ = ['MultiMetric']
+
 class MultiMetric(Generic[TInput, TTarget], EvaluationMetric[TInput, TTarget]):
     def __init__(self):
         super().__init__()

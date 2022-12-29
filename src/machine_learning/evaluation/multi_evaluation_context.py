@@ -2,7 +2,11 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import *
 
+from ..modeling.model import TInput, TTarget
+
 from .evaluation_context import *
+
+__all__ = ['Score', 'MultiEvaluationContext']
 
 @dataclass(frozen=True)
 class Score():

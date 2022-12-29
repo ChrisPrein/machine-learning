@@ -3,6 +3,8 @@ from typing import Generic, Iterable
 from .evaluation_context import Prediction
 from ..modeling.model import TInput, TTarget
 
+__all__ = ['EvaluationMetric']
+
 class EvaluationMetric(Generic[TInput, TTarget], ABC):
     def __init__(self):
         super().__init__()
