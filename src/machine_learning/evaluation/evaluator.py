@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Tuple
 from ..modeling.model import TInput, TTarget
 from .evaluation_service import TModel
 
-__all__ = ['InputBatch', 'Input', 'TargetBatch', 'Target', 'EvaluatorResult']
+__all__ = ['InputBatch', 'Input', 'TargetBatch', 'Target', 'EvaluatorResult', 'Evaluator']
 
 InputBatch = Iterable[TInput]
 Input = Union[TInput, InputBatch[TInput]]
