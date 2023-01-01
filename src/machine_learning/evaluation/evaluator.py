@@ -10,7 +10,7 @@ __all__ = ['InputBatch', 'Input', 'TargetBatch', 'Target', 'EvaluatorResult', 'E
 InputBatch = Iterable[TInput]
 Input = Union[TInput, InputBatch[TInput]]
 TargetBatch = Iterable[TTarget]
-Target = Union[TInput, TargetBatch[TTarget]]
+Target = Union[TTarget, TargetBatch[TTarget]]
 EvaluatorResult = Tuple[List[TTarget], Union[float, Dict[str, float]]]
 
 class Evaluator(Generic[TInput, TTarget, TModel], ABC):
