@@ -21,7 +21,7 @@ class PreValidationPlugin(Generic[TInput, TTarget, TModel, TTrainer]):
 ValidationPlugins = Union[PreValidationPlugin, PostValidationPlugin]
 
 class ValidationPlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
-    def __init__(self, evaluation_service: EvaluationService[TInput, TTarget, TModel, TTrainer], validation_datasets: EvaluationDataset, validation_metrics: EvaluationMetrics, event_loop: asyncio.AbstractEventLoop = None, plugins: Dict[str, ValidationPlugins] = {}):
+    def __init__(self, evaluation_service: EvaluationService[TInput, TTarget, TModel], validation_datasets: EvaluationDataset, validation_metrics: EvaluationMetrics, event_loop: asyncio.AbstractEventLoop = None, plugins: Dict[str, ValidationPlugins] = {}):
         if evaluation_service == None:
             raise ValueError('evaluaiton_service')
 

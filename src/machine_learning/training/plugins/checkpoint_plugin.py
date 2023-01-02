@@ -4,8 +4,9 @@ from logging import Logger
 import pathlib
 import pickle
 from typing import Generic
-from machine_learning.training import TModel, TTrainer, PreLoop, PostEpoch, TrainingContext
-from machine_learning import TInput, TTarget
+from ...training import TModel, TTrainer, PreLoop, PostEpoch, TrainingContext
+from ...modeling import TInput, TTarget
+from ...repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository
 import asyncio
 
 @dataclass
@@ -14,42 +15,12 @@ class TrainingCheckpoint:
     current_batch_index: int
     continue_training: bool
 
-class ModelRepository(Generic[TModel], ABC):
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    async def get(self, name: str) -> TModel: ...
-
-    @abstractmethod
-    async def save(self, model: TModel, name: str): ...
-
-class TrainerRepository(Generic[TTrainer], ABC):
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    async def get(self, name: str) -> TTrainer: ...
-
-    @abstractmethod
-    async def save(self, trainer: TTrainer, name: str): ...
-
-class TrainingCheckpointRepository(ABC):
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    async def get(self, name: str) -> TrainingCheckpoint: ...
-
-    @abstractmethod
-    async def save(self, checkpoint: TrainingCheckpoint, name: str): ...
-
 LATEST_MODEL_NAME: str = "latest-model"
 LATEST_TRAINER_NAME: str = "latest-trainer"
 LATEST_TRAINING_CHECKPOINT_NAME: str = "latest-checkpoint"
 
-class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel], PreLoop[TInput, TTarget, TModel]):
-    def __init__(self, model_checkpoint_repository: ModelRepository, training_checkpoint_repository: TrainingCheckpointRepository, trainer_repository: TrainerRepository, event_loop: asyncio.AbstractEventLoop = None):
+class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel, TTrainer], PreLoop[TInput, TTarget, TModel, TTrainer]):
+    def __init__(self, model_checkpoint_repository: ModelRepository, training_checkpoint_repository: TrainingCheckpointRepository, trainer_repository: TrainerRepository[TTrainer], event_loop: asyncio.AbstractEventLoop = None):
         if model_checkpoint_repository is None:
             raise TypeError('model_checkpoint_repository')
 
@@ -69,7 +40,7 @@ class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel], PreLoop[TInput, TTarg
         if self.checkpoint is None:
             self.checkpoint = TrainingCheckpoint(current_epoch=0, current_batch_index=0, continue_training=True)
 
-    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel]):
+    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
         logger.info('Creating checkpoint...')
 
         self.checkpoint.current_epoch = training_context.current_epoch
@@ -81,7 +52,7 @@ class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel], PreLoop[TInput, TTarg
 
         logger.info('Checkpoint created!')
 
-    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel]):
+    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
         logger.info('Loading checkpoint...')
 
         training_context.current_epoch = self.checkpoint.current_epoch

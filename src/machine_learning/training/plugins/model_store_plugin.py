@@ -5,7 +5,7 @@ from typing import Dict, Union
 from ...evaluation.evaluation_context import TModel
 from ...modeling import TInput, TTarget
 from ..batch_training_service import PostEpoch, TTrainer, TrainingContext
-from .checkpoint_plugin import ModelRepository
+from ...repositories import ModelRepository, ModelMetadataRepository
 import asyncio
 
 BEST_MODEL_NAME: str = "best-model"
@@ -15,25 +15,15 @@ METADATA_NAME: str = "best-model-meta"
 class ModelMetadata:
     loss: float
 
-class ModelMetadataRepository(ABC):
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    async def get(self, name: str) -> ModelMetadata: ...
-
-    @abstractmethod
-    async def save(self, metadata: ModelMetadata, name: str): ...
-
 class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
-    def __init__(self, model_repository: ModelRepository, metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):
+    def __init__(self, model_repository: ModelRepository[TModel], metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):
         if model_repository is None:
             raise TypeError('model_repository')
 
         if metadata_repository is None:
             raise TypeError('metadata_repository')
 
-        self.model_repository: ModelRepository = model_repository
+        self.model_repository: ModelRepository[TModel] = model_repository
         self.metadata_repository: ModelMetadataRepository = metadata_repository
         self.loss_key: str = loss_key
         self.event_loop: asyncio.AbstractEventLoop = event_loop if event_loop != None else asyncio.get_event_loop()
