@@ -28,15 +28,15 @@ class TrainingCheckpointWandBRepository(TrainingCheckpointRepository):
             return self.cache[name]
 
         try:
-            metadata_file = self.run.restore(self.get_file_name(name))
+            checkpoint_file = self.run.restore(self.get_file_name(name))
 
-            content_dict: Dict[str, Any] = json.load(metadata_file)
+            content_dict: Dict[str, Any] = json.load(checkpoint_file)
 
-            model_metadata: TrainingCheckpoint = TrainingCheckpoint(**content_dict)
+            training_checkpoint: TrainingCheckpoint = TrainingCheckpoint(**content_dict)
 
-            self.cache[name] = model_metadata
+            self.cache[name] = training_checkpoint
 
-            return model_metadata
+            return training_checkpoint
         except:
             return None
 
