@@ -5,6 +5,8 @@ from typing import Any, Dict
 from .model_metadata_repository import ModelMetadataRepository, ModelMetadata
 from wandb.wandb_run import Run
 
+__all__ = ['ModelMetadataWandBRepository']
+
 class ModelMetadataWandBRepository(ModelMetadataRepository):
     def __init__(self, run: Run):
         super().__init__()
@@ -22,6 +24,9 @@ class ModelMetadataWandBRepository(ModelMetadataRepository):
         return Path(self.run.dir) / self.get_file_name(name)
 
     async def get(self, name: str) -> ModelMetadata:
+        if name in self.cache:
+            return self.cache[name]
+
         try:
             metadata_file = self.run.restore(self.get_file_name(name))
 
@@ -29,11 +34,15 @@ class ModelMetadataWandBRepository(ModelMetadataRepository):
 
             model_metadata: ModelMetadata = ModelMetadata(**content_dict)
 
+            self.cache[name] = model_metadata
+
             return model_metadata
         except:
             return None
 
     async def save(self, metadata: ModelMetadata, name: str):
+        self.cache[name] = metadata
+
         content_dict: Dict[str, Any] = asdict(metadata)
 
         file_path: Path = self.get_file_path(name)
