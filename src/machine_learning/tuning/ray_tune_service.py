@@ -1,15 +1,13 @@
-from abc import ABC, abstractmethod
 import asyncio
 from functools import partial
 from logging import Logger
 import logging
-from typing import Any, Callable, Dict, Optional, TypeVar, Generic, Tuple, Union, overload
-import ray
+from typing import Any, Callable, Dict, Optional, Tuple
 from ray import tune
-from ray.tune.schedulers import ASHAScheduler, TrialScheduler
+from ray.tune.schedulers import TrialScheduler
 
 from ..evaluation.multi_evaluation_context import Score
-from ..modeling.model import TInput, TTarget, Model
+from ..modeling.model import TInput, TTarget
 from ..training import TrainingService
 from .tuning_service import Dataset, TModel, TrainingDataset, TuningService
 

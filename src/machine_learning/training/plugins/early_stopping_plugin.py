@@ -1,8 +1,7 @@
-import asyncio
 from logging import Logger
 
 from ...evaluation import EvaluationResult
-from ...modeling import Model, TInput, TTarget
+from ...modeling import TInput, TTarget
 from .validation_plugin import PostValidationPlugin
 from ...training.batch_training_service import TTrainer, TrainingContext, TModel
 from typing import *
@@ -40,4 +39,3 @@ class EarlyStoppingPlugin(PostValidationPlugin[TInput, TTarget, TModel, TTrainer
                 training_context.continue_training = False
 
         logger.info("Finished checking stop conditions.")
-
