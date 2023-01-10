@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from logging import Logger
 from ...training import TModel, TTrainer, PreLoop, PostEpoch, TrainingContext
 from ...modeling import TInput, TTarget
-from ...repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository
+from .repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository
 import asyncio
 
 @dataclass

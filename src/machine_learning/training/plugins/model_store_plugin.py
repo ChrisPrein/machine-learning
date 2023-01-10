@@ -5,7 +5,7 @@ from typing import Dict, Union
 from ...evaluation.evaluation_context import TModel
 from ...modeling import TInput, TTarget
 from ..batch_training_service import PostEpoch, TTrainer, TrainingContext
-from ...repositories import ModelRepository, ModelMetadataRepository
+from .repositories import ModelRepository, ModelMetadataRepository
 import asyncio
 
 BEST_MODEL_NAME: str = "best-model"
