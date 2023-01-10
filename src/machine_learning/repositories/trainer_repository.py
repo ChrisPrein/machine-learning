@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Generic
-from ..training import TTrainer
+from typing import Generic, TypeVar
+from ..training.trainer import Trainer
 
 __all__ = ['TrainerRepository']
+
+TTrainer = TypeVar('TTrainer', bound=Trainer)
 
 class TrainerRepository(Generic[TTrainer], ABC):
     def __init__(self):
