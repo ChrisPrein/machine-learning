@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ..training.plugins.checkpoint_plugin import TrainingCheckpoint
+from ..checkpoint_plugin import TrainingCheckpoint
 
 __all__ = ['TrainingCheckpointRepository']
 

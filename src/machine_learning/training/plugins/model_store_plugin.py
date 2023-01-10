@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
 from typing import Dict, Union
@@ -13,6 +14,16 @@ METADATA_NAME: str = "best-model-meta"
 @dataclass
 class ModelMetadata:
     loss: float
+
+class ModelMetadataRepository(ABC):
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    async def get(self, name: str) -> ModelMetadata: ...
+
+    @abstractmethod
+    async def save(self, metadata: ModelMetadata, name: str): ...
 
 class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
     def __init__(self, model_repository: ModelRepository[TModel], metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):

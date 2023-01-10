@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from ..modeling import Model
+from ....modeling import Model
 
 __all__ = ['ModelRepository']
 

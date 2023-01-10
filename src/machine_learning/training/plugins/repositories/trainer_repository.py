@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from ..training.trainer import Trainer
+from ...trainer import Trainer
 
 __all__ = ['TrainerRepository']
 

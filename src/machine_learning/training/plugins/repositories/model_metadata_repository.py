@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ..training.plugins.model_store_plugin import ModelMetadata
+from ..model_store_plugin import ModelMetadata
 
 __all__ = ['ModelMetadataRepository']
 
