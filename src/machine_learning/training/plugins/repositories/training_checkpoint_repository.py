@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
-from ..checkpoint_plugin import TrainingCheckpoint
+from dataclasses import dataclass
 
-__all__ = ['TrainingCheckpointRepository']
+__all__ = ['TrainingCheckpointRepository', 'TrainingCheckpoint']
+
+@dataclass
+class TrainingCheckpoint:
+    current_epoch: int
+    current_batch_index: int
+    continue_training: bool
 
 class TrainingCheckpointRepository(ABC):
     def __init__(self):

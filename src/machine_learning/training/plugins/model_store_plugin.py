@@ -5,25 +5,13 @@ from typing import Dict, Union
 from ...evaluation.evaluation_context import TModel
 from ...modeling import TInput, TTarget
 from ..batch_training_service import PostEpoch, TTrainer, TrainingContext
-from .repositories import ModelRepository, ModelMetadataRepository
+from .repositories import ModelRepository, ModelMetadataRepository, ModelMetadata
 import asyncio
 
 BEST_MODEL_NAME: str = "best-model"
 METADATA_NAME: str = "best-model-meta"
 
-@dataclass
-class ModelMetadata:
-    loss: float
 
-class ModelMetadataRepository(ABC):
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    async def get(self, name: str) -> ModelMetadata: ...
-
-    @abstractmethod
-    async def save(self, metadata: ModelMetadata, name: str): ...
 
 class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
     def __init__(self, model_repository: ModelRepository[TModel], metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):

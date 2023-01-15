@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
-from ..model_store_plugin import ModelMetadata
+from dataclasses import dataclass
 
-__all__ = ['ModelMetadataRepository']
+__all__ = ['ModelMetadataRepository', 'ModelMetadata']
+
+@dataclass
+class ModelMetadata:
+    loss: float
 
 class ModelMetadataRepository(ABC):
     def __init__(self):

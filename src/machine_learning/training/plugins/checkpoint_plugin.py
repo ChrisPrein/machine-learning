@@ -2,14 +2,8 @@ from dataclasses import dataclass
 from logging import Logger
 from ...training import TModel, TTrainer, PreLoop, PostEpoch, TrainingContext
 from ...modeling import TInput, TTarget
-from .repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository
+from .repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository, TrainingCheckpoint
 import asyncio
-
-@dataclass
-class TrainingCheckpoint:
-    current_epoch: int
-    current_batch_index: int
-    continue_training: bool
 
 LATEST_MODEL_NAME: str = "latest-model"
 LATEST_TRAINER_NAME: str = "latest-trainer"
