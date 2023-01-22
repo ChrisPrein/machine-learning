@@ -29,6 +29,9 @@ class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
         self.best_model: TModel = self.event_loop.run_until_complete(self.model_repository.get(BEST_MODEL_NAME))
         self.metadata: ModelMetadata = self.event_loop.run_until_complete(self.metadata_repository.get(METADATA_NAME))
 
+        if self.metadata is None:
+            self.metadata = ModelMetadata(float('inf'))
+
     def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
         current_loss: Union[float, Dict[str, float]] = training_context.train_losses[-1]
 
