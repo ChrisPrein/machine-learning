@@ -11,8 +11,6 @@ import asyncio
 BEST_MODEL_NAME: str = "best-model"
 METADATA_NAME: str = "best-model-meta"
 
-
-
 class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
     def __init__(self, model_repository: ModelRepository[TModel], metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):
         if model_repository is None:
@@ -45,6 +43,6 @@ class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
             self.metadata.loss = current_loss
 
             self.event_loop.create_task(self.model_repository.save(self.best_model, BEST_MODEL_NAME))
-            self.event_loop.create_task(self.metadata_repository.save(self.metadata))
+            self.event_loop.create_task(self.metadata_repository.save(self.metadata, METADATA_NAME))
 
             logger.info('Current best model saved!')
