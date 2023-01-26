@@ -70,7 +70,7 @@ def is_dataset(val: List[object]) -> TypeGuard[Dataset]:
 def is_list_dataset(val: List[object]) -> TypeGuard[List[Dataset]]:
     return all(is_dataset(x) for x in val)
 
-class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], TrainingService[TInput, TTarget, TModel], ABC):
+class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], TrainingService[TInput, TTarget, TModel]):
     def __init__(self, 
         trainer: TTrainer, 
         logger: Optional[Logger]=None,

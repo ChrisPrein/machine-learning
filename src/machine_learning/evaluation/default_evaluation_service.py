@@ -1,7 +1,7 @@
 from collections import deque
 from logging import Logger
 import logging
-from typing import Callable, Iterable, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
+from typing import Callable, Generic, Iterable, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
 import time
 
 from .evaluator import EvaluatorResult, Input, Target, Evaluator
@@ -31,7 +31,7 @@ def is_dataset(val: List[object]) -> TypeGuard[Dataset]:
 def is_list_dataset(val: List[object]) -> TypeGuard[List[Dataset]]:
     return all(is_dataset(x) for x in val)
 
-class DefaultEvaluationService(EvaluationService[TInput, TTarget, TOutput, TModel, TEvaluator]):
+class DefaultEvaluationService(Generic[TInput, TTarget, TOutput, TModel, TEvaluator], EvaluationService[TInput, TTarget, TOutput, TModel]):
     def __init__(self, 
         evaluator: TEvaluator,
         logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TOutput, TModel]] = {}, 
