@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from ...training import TModel, TTrainer, PreLoop, PostEpoch, TrainingContext
-from ...modeling import TInput, TTarget
+from ...modeling import TInput, TTarget, TOutput
 from .repositories import ModelRepository, TrainingCheckpointRepository, TrainerRepository, TrainingCheckpoint
 import asyncio
 
@@ -9,7 +9,7 @@ LATEST_MODEL_NAME: str = "latest-model"
 LATEST_TRAINER_NAME: str = "latest-trainer"
 LATEST_TRAINING_CHECKPOINT_NAME: str = "latest-checkpoint"
 
-class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel, TTrainer], PreLoop[TInput, TTarget, TModel, TTrainer]):
+class CheckpointPlugin(PostEpoch[TInput, TTarget, TOutput, TModel, TTrainer], PreLoop[TInput, TTarget, TOutput, TModel, TTrainer]):
     def __init__(self, model_checkpoint_repository: ModelRepository, training_checkpoint_repository: TrainingCheckpointRepository, trainer_repository: TrainerRepository[TTrainer], event_loop: asyncio.AbstractEventLoop = None):
         if model_checkpoint_repository is None:
             raise TypeError('model_checkpoint_repository')
@@ -30,7 +30,7 @@ class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel, TTrainer], PreLoop[TIn
         if self.checkpoint is None:
             self.checkpoint = TrainingCheckpoint(current_epoch=0, current_batch_index=0, continue_training=True)
 
-    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.info('Creating checkpoint...')
 
         self.checkpoint.current_epoch = training_context.current_epoch
@@ -42,7 +42,7 @@ class CheckpointPlugin(PostEpoch[TInput, TTarget, TModel, TTrainer], PreLoop[TIn
 
         logger.info('Checkpoint created!')
 
-    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.info('Loading checkpoint...')
 
         training_context.current_epoch = self.checkpoint.current_epoch

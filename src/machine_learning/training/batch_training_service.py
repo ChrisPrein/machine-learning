@@ -10,7 +10,7 @@ from custom_operators.operators.true_division import *
 
 from ..evaluation.evaluation_context import Prediction
 from .trainer import Trainer
-from ..modeling.model import TInput, TTarget
+from ..modeling.model import TInput, TTarget, TOutput
 from .training_service import Dataset, TrainingDataset, TModel, TrainingService
 
 __all__ = ['TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'PreEpoch', 'PostEpoch', 'PreTrain', 'PostTrain', 'BatchTrainingService', 'TTrainer']
@@ -18,47 +18,47 @@ __all__ = ['TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'Pre
 TTrainer = TypeVar('TTrainer', bound=Trainer)
 
 @dataclass
-class TrainingContext(Generic[TInput, TTarget, TModel, TTrainer]):
+class TrainingContext(Generic[TInput, TTarget, TOutput, TModel, TTrainer]):
     model: TModel
     trainer: TTrainer
     dataset_name: str
     current_epoch: int
     current_batch_index: int
-    predictions: Deque[Prediction[TInput, TTarget]]
+    predictions: Deque[Prediction[TInput, TTarget, TOutput]]
     train_losses: Deque[Union[float, Dict[str, float]]]
     continue_training: bool
 
-class BatchTrainingPlugin(Generic[TInput, TTarget, TModel, TTrainer], ABC):
+class BatchTrainingPlugin(Generic[TInput, TTarget, TOutput, TModel, TTrainer], ABC):
     pass
 
-class PreLoop(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PreLoop(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def pre_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
-class PostLoop(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PostLoop(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def post_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def post_loop(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
-class PreEpoch(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PreEpoch(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def pre_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def pre_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
-class PostEpoch(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PostEpoch(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
-class PreTrain(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PreTrain(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def pre_train(self, logger: Logger, trainging_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def pre_train(self, logger: Logger, trainging_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
-class PostTrain(BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]):
+class PostTrain(BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]):
     @abstractmethod
-    def post_train(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def post_train(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         pass
 
 def is_batch(val: List[object]) -> TypeGuard[Tuple]:
@@ -70,14 +70,14 @@ def is_dataset(val: List[object]) -> TypeGuard[Dataset]:
 def is_list_dataset(val: List[object]) -> TypeGuard[List[Dataset]]:
     return all(is_dataset(x) for x in val)
 
-class BatchTrainingService(Generic[TInput, TTarget, TModel, TTrainer], TrainingService[TInput, TTarget, TModel], ABC):
+class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], TrainingService[TInput, TTarget, TModel], ABC):
     def __init__(self, 
         trainer: TTrainer, 
         logger: Optional[Logger]=None,
         max_epochs: int = 100, 
         max_losses: Optional[int] = None, 
         max_predictions: Optional[int] = None, 
-        plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TModel, TTrainer]] = {}, 
+        plugins: Dict[str, BatchTrainingPlugin[TInput, TTarget, TOutput, TModel, TTrainer]] = {}, 
         **kwargs):
 
         if trainer == None:
@@ -89,50 +89,50 @@ class BatchTrainingService(Generic[TInput, TTarget, TModel, TTrainer], TrainingS
         self.__max_losses: Optional[int] = max_losses
         self.__max_predictions: Optional[int] = max_predictions
        
-        self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
-        self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
-        self.__pre_epoch_plugins: Dict[str, PreEpoch[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreEpoch), plugins.items()))
-        self.__post_epoch_plugins: Dict[str, PostEpoch[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostEpoch), plugins.items()))
-        self.__pre_train_plugins: Dict[str, PreTrain[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreTrain), plugins.items()))
-        self.__post_train_plugins: Dict[str, PostTrain[TInput, TTarget, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostTrain), plugins.items()))
+        self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
+        self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
+        self.__pre_epoch_plugins: Dict[str, PreEpoch[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreEpoch), plugins.items()))
+        self.__post_epoch_plugins: Dict[str, PostEpoch[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostEpoch), plugins.items()))
+        self.__pre_train_plugins: Dict[str, PreTrain[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PreTrain), plugins.items()))
+        self.__post_train_plugins: Dict[str, PostTrain[TInput, TTarget, TOutput, TModel, TTrainer]] = dict(filter(lambda plugin: isinstance(plugin[1], PostTrain), plugins.items()))
 
-    def __execute_pre_loop_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_pre_loop_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing pre loop plugins...")
         for name, plugin in self.__pre_loop_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.pre_loop(logger, context)
 
-    def __execute_post_loop_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_post_loop_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing post loop plugins...")
         for name, plugin in self.__post_loop_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_loop(logger, context)
 
-    def __execute_pre_epoch_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_pre_epoch_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing pre epoch plugins...")
         for name, plugin in self.__pre_epoch_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.pre_epoch(logger, context)
 
-    def __execute_post_epoch_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_post_epoch_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing post epoch plugins...")
         for name, plugin in self.__post_epoch_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_epoch(logger, context)
 
-    def __execute_pre_train_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_pre_train_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing pre train plugins...")
         for name, plugin in self.__pre_train_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.pre_train(logger, context)
 
-    def __execute_post_train_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def __execute_post_train_plugins(self, logger: Logger, context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         logger.debug("Executing post train plugins...")
         for name, plugin in self.__post_train_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_train(logger, context)
 
-    def __has_max_number_of_epochs_been_reached(self, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]) -> bool:
+    def __has_max_number_of_epochs_been_reached(self, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]) -> bool:
         return training_context.current_epoch >= self.__max_epochs
 
     async def train(self, model: TModel, dataset: TrainingDataset,  logger: Optional[Logger] = None) -> TModel:
@@ -150,12 +150,12 @@ class BatchTrainingService(Generic[TInput, TTarget, TModel, TTrainer], TrainingS
         if training_dataset is None:
             raise ValueError("dataset")
 
-        training_context: TrainingContext[TInput, TTarget, TModel, TTrainer] = None
+        training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer] = None
 
         dataset: Dataset = training_dataset[1]
         dataset_name: str = training_dataset[0]
 
-        training_context = TrainingContext[TInput, TTarget, TModel, TTrainer](model=model, trainer=self.__trainer, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), predictions=deque([], self.__max_predictions), current_epoch=0, current_batch_index=0, continue_training=True)
+        training_context = TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer](model=model, trainer=self.__trainer, dataset_name=dataset_name, train_losses=deque([], self.__max_losses), predictions=deque([], self.__max_predictions), current_epoch=0, current_batch_index=0, continue_training=True)
 
         logger.info('Starting training loop...')
 

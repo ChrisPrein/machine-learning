@@ -1,7 +1,7 @@
 from collections import deque
 from logging import Logger
 import logging
-from typing import Callable, Iterable, List, Optional, Dict, Tuple, TypeGuard, Union, overload
+from typing import Callable, Iterable, List, Optional, Dict, Tuple, TypeGuard, TypeVar, Union, overload
 import time
 
 from .evaluator import EvaluatorResult, Input, Target, Evaluator
@@ -11,12 +11,14 @@ from .multi_evaluation_context import MultiEvaluationContext, Score
 from .default_evaluation_plugin import DefaultEvaluationPlugin, PostEvaluationStep, PostLoop, PostMultiEvaluationStep, PostMultiLoop, PreEvaluationStep, PreLoop, PreMultiEvaluationStep, PreMultiLoop
 from .evaluation_context import EvaluationContext, Prediction, TModel
 from .evaluation_service import Dataset, EvaluationDataset, EvaluationMetrics, EvaluationResult, PredictionData, Predictions, EvaluationService
-from ..modeling.model import TInput, TTarget
+from ..modeling.model import TInput, TTarget, TOutput
 from custom_operators.operators.true_division import *
 from tqdm import tqdm
 import nest_asyncio
 
 __all__ = ['DefaultEvaluationService']
+
+TEvaluator = TypeVar('TEvaluator', bound=Evaluator)
 
 nest_asyncio.apply()
 
@@ -29,28 +31,28 @@ def is_dataset(val: List[object]) -> TypeGuard[Dataset]:
 def is_list_dataset(val: List[object]) -> TypeGuard[List[Dataset]]:
     return all(is_dataset(x) for x in val)
 
-class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
+class DefaultEvaluationService(EvaluationService[TInput, TTarget, TOutput, TModel, TEvaluator]):
     def __init__(self, 
-        evaluator: Callable[[TModel, Input, Target, Logger], EvaluatorResult],
-        logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TModel]] = {}, 
+        evaluator: TEvaluator,
+        logger: Optional[Logger]=None, plugins: Dict[str, DefaultEvaluationPlugin[TInput, TTarget, TOutput, TModel]] = {}, 
         max_predictions: Optional[int] = None, max_losses: Optional[int] = None, **kwargs):
 
         if evaluator == None:
             raise TypeError("evaluator")
 
         self.__logger = logger if not logger is None else logging.getLogger()
-        self.__evaluator: Callable[[TModel, Input, Target, Logger], EvaluatorResult] = evaluator
+        self.__evaluator: TEvaluator = evaluator
         self.__max_predictions: Optional[int] = max_predictions
         self.__max_losses: Optional[int] = max_losses
 
-        self.__pre_multi_loop_plugins: Dict[str, PreMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiLoop), plugins.items()))
-        self.__post_multi_loop_plugins: Dict[str, PostMultiLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiLoop), plugins.items()))
-        self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
-        self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
-        self.__pre_evaluation_step_plugins: Dict[str, PreEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreEvaluationStep), plugins.items()))
-        self.__post_evaluation_step_plugins: Dict[str, PostEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostEvaluationStep), plugins.items()))
-        self.__pre_multi_evaluation_step_plugins: Dict[str, PreMultiEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiEvaluationStep), plugins.items()))
-        self.__post_multi_evaluation_step_plugins: Dict[str, PostMultiEvaluationStep[TInput, TTarget, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiEvaluationStep), plugins.items()))
+        self.__pre_multi_loop_plugins: Dict[str, PreMultiLoop[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiLoop), plugins.items()))
+        self.__post_multi_loop_plugins: Dict[str, PostMultiLoop[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiLoop), plugins.items()))
+        self.__pre_loop_plugins: Dict[str, PreLoop[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreLoop), plugins.items()))
+        self.__post_loop_plugins: Dict[str, PostLoop[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostLoop), plugins.items()))
+        self.__pre_evaluation_step_plugins: Dict[str, PreEvaluationStep[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreEvaluationStep), plugins.items()))
+        self.__post_evaluation_step_plugins: Dict[str, PostEvaluationStep[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostEvaluationStep), plugins.items()))
+        self.__pre_multi_evaluation_step_plugins: Dict[str, PreMultiEvaluationStep[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PreMultiEvaluationStep), plugins.items()))
+        self.__post_multi_evaluation_step_plugins: Dict[str, PostMultiEvaluationStep[TInput, TTarget, TOutput, TModel]] = dict(filter(lambda plugin: isinstance(plugin[1], PostMultiEvaluationStep), plugins.items()))
 
     def __execute_pre_multi_loop_plugins(self, logger: Logger, context: MultiEvaluationContext):
         logger.debug("Executing pre multi loop plugins...")
@@ -76,45 +78,45 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_multi_evaluation_step(logger, context)
 
-    def __execute_pre_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+    def __execute_pre_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TOutput, TModel]):
         logger.debug("Executing pre loop plugins...")
         for name, plugin in self.__pre_loop_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.pre_loop(logger, context)
 
-    def __execute_post_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel], result: Dict[str, Score]):
+    def __execute_post_loop_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TOutput, TModel], result: Dict[str, Score]):
         logger.debug("Executing post loop plugins...")
         for name, plugin in self.__post_loop_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_loop(logger, context, result)
 
-    def __execute_pre_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+    def __execute_pre_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TOutput, TModel]):
         logger.debug("Executing pre train plugins...")
         for name, plugin in self.__pre_evaluation_step_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.pre_evaluation_step(logger, context)
 
-    def __execute_post_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TModel]):
+    def __execute_post_evaluation_step_plugins(self, logger: Logger, context: EvaluationContext[TInput, TTarget, TOutput, TModel]):
         logger.debug("Executing post train plugins...")
         for name, plugin in self.__post_evaluation_step_plugins.items():
             logger.debug(f"Executing plugin with name {name}...")
             plugin.post_evaluation_step(logger, context)
 
-    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]], logger: Logger) -> Tuple[List[Prediction], Union[float, Dict[str, float]]]:
+    def __predict_batch(self, evaluation_context: EvaluationContext[TInput, TTarget, TOutput, TModel], model: TModel, batch: List[Tuple[TInput, TTarget]], logger: Logger) -> Tuple[List[Prediction[TInput, TTarget, TOutput]], Union[float, Dict[str, float]]]:
         inputs: List[TInput] = [sample[0] for sample in batch]
         targets: List[TTarget] = [sample[1] for sample in batch]
         predictions, loss = self.__evaluator(model, inputs, targets, logger)
 
-        combined: List[Tuple[TInput, TTarget, TTarget]] = zip(inputs, predictions, targets)
+        combined: List[Tuple[TInput, TOutput, TTarget]] = zip(inputs, predictions, targets)
 
         return [Prediction(result[0], result[1], result[2]) for result in combined], loss
 
-    def __reset_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]]):
+    def __reset_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TOutput]]):
         logger.debug("Reseting evaluation metrics...")
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.reset()
 
-    def __update_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget]], batch: List[Prediction]):
+    def __update_evaluation_metrics(self, logger: Logger, evaluation_metrics: Dict[str, EvaluationMetric[TInput, TTarget, TOutput]], batch: List[Prediction[TInput, TTarget, TOutput]]):
         logger.debug("Updating evaluation metrics...")
         for metric_name, evaluation_metrtic in evaluation_metrics.items():
             evaluation_metrtic.update(batch)
@@ -167,7 +169,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         dataset: Dataset = evaluation_dataset[1]
         dataset_name: str = evaluation_dataset[0]
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](model, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
+        evaluation_context: EvaluationContext[TInput, TTarget, TOutput, TModel] = EvaluationContext[TInput, TTarget, TOutput, TModel](model, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
 
         self.__reset_evaluation_metrics(logger, evaluation_metrics)
 
@@ -277,7 +279,7 @@ class DefaultEvaluationService(EvaluationService[TInput, TTarget, TModel]):
         prediction_set: Predictions = predictions[1]
         dataset_name: str = predictions[0]
 
-        evaluation_context: EvaluationContext[TInput, TTarget, TModel] = EvaluationContext[TInput, TTarget, TModel](None, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
+        evaluation_context: EvaluationContext[TInput, TTarget, TOutput, TModel] = EvaluationContext[TInput, TTarget, TOutput, TModel](None, dataset_name, deque([], self.__max_predictions), 0, deque([], self.__max_losses))
 
         self.__reset_evaluation_metrics(logger, evaluation_metrics)
 

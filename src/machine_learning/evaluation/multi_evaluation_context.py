@@ -15,6 +15,6 @@ class Score():
     dataset_name: str
 
 @dataclass()
-class MultiEvaluationContext(Generic[TInput, TTarget, TModel], ABC):
+class MultiEvaluationContext(ABC):
     current_dataset_index: int
     scores: Dict[str, Dict[str, Score]]

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from logging import Logger
 from typing import Dict, Union
 from ...evaluation.evaluation_context import TModel
-from ...modeling import TInput, TTarget
+from ...modeling import TInput, TTarget, TOutput
 from ..batch_training_service import PostEpoch, TTrainer, TrainingContext
 from .repositories import ModelRepository, ModelMetadataRepository, ModelMetadata
 import asyncio
@@ -11,7 +11,7 @@ import asyncio
 BEST_MODEL_NAME: str = "best-model"
 METADATA_NAME: str = "best-model-meta"
 
-class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
+class ModelStorePlugin(PostEpoch[TInput, TTarget, TOutput, TModel, TTrainer]):
     def __init__(self, model_repository: ModelRepository[TModel], metadata_repository: ModelMetadataRepository, loss_key: str = None, event_loop: asyncio.AbstractEventLoop = None):
         if model_repository is None:
             raise TypeError('model_repository')
@@ -30,7 +30,7 @@ class ModelStorePlugin(PostEpoch[TInput, TTarget, TModel, TTrainer]):
         if self.metadata is None:
             self.metadata = ModelMetadata(float('inf'))
 
-    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TModel, TTrainer]):
+    def post_epoch(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer]):
         current_loss: Union[float, Dict[str, float]] = training_context.train_losses[-1]
 
         if isinstance(current_loss, dict):

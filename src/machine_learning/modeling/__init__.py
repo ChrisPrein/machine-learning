@@ -1,3 +1,3 @@
 from .model import *
 
-__all__ = ['Model', "TInput", "TTarget"]
+__all__ = ['Model', "TInput", "TTarget", "TOutput"]
