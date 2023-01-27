@@ -199,7 +199,7 @@ class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], 
                 predictions, train_loss = self.__trainer(model, inputs, targets, logger)
                 
                 training_context.train_losses.append(train_loss)
-                training_context.predictions.extend(predictions)
+                training_context.predictions.extend([Prediction(input, output, target) for input, target, output in zip(inputs, targets, predictions)])
 
                 self.__execute_post_train_plugins(logger, training_context)
 
