@@ -48,7 +48,7 @@ class TrainingCheckpointWandBRepository(TrainingCheckpointRepository):
         file_path: Path = self.get_file_path(name)
         file_path.touch()
 
-        file = file_path.open()
+        file = file_path.open('w')
 
         json.dump(content_dict, file)
 
