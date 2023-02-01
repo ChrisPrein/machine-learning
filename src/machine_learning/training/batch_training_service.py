@@ -216,6 +216,8 @@ class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], 
 
             self.__execute_post_epoch_plugins(logger, training_context)
 
+            training_context.current_batch_index = 0
+
             logger.info("Finished epoch.")
             logger.info(f"Epoch took {time.time() - epoch_start_time} seconds.")
 
