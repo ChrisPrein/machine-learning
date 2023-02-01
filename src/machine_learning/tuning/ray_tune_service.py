@@ -61,7 +61,7 @@ class RayTuneService(TuningService[TInput, TTarget, TModel]):
         tuner = tune.Tuner(
             tune.with_resources(
                 tune.with_parameters(partial(self.__train(model_factory=model_factory, training_service_factory=training_service_factory, train_dataset=train_dataset, logger=logger))),
-                resources=self.__resource_config
+                resources=self.__resource_config,
             ),
             tune_config=tune.TuneConfig(
                 metric=self.__metric,
