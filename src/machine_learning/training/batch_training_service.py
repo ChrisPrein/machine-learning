@@ -166,6 +166,8 @@ class BatchTrainingService(Generic[TInput, TTarget, TOutput, TModel, TTrainer], 
             epoch_start_time: float = time.time()
             training_context.current_epoch += 1
 
+            logger.info(f'Current epoch: {training_context.current_epoch}')
+
             self.__execute_pre_epoch_plugins(logger, training_context)
 
             sum_iteration_run_time: float = 0
