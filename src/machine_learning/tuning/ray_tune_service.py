@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from ray import tune
 from ray.tune.schedulers import TrialScheduler
 
-from ..evaluation.multi_evaluation_context import Score
 from ..modeling.model import TInput, TTarget
 from ..training import TrainingService
 from .tuning_service import Dataset, TModel, TrainingDataset, TuningService
@@ -44,7 +43,7 @@ class RayTuneService(TuningService[TInput, TTarget, TModel]):
         training_service_factory: Callable[[], TrainingService[TInput, TTarget, TModel]], 
         train_dataset: TrainingDataset[TInput, TTarget], 
         params: Dict[str, Any], 
-        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, Score]]]:
+        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, float]]]:
 
         if isinstance(train_dataset, tuple):
             return await self.__tune(model_factory=model_factory, training_service_factory=training_service_factory, train_dataset=train_dataset, params=params, logger=logger)
@@ -56,7 +55,7 @@ class RayTuneService(TuningService[TInput, TTarget, TModel]):
         training_service_factory: Callable[[], TrainingService[TInput, TTarget, TModel]], 
         train_dataset: Tuple[str, Dataset[TInput, TTarget]], 
         params: Dict[str, Any], 
-        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, Score]]]:
+        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, float]]]:
 
         tuner = tune.Tuner(
             tune.with_resources(

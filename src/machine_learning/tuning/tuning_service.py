@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from typing import Any, Callable, Dict, Optional, TypeVar, Generic, Tuple, Union, overload, Iterable
 
-from ..evaluation.multi_evaluation_context import Score
 from ..modeling.model import TInput, TTarget, Model
 from ..training import TrainingService
 
