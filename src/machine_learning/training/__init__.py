@@ -5,4 +5,4 @@ from .plugins import *
 
 __all__ = ['StopCondition', 'StopConditions', 'EarlyStoppingPlugin', 'PostValidationPlugin', 'PreValidationPlugin', 'ValidationPlugins', 'ValidationPlugin', 
     'TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'PreEpoch', 'PostEpoch', 'PreTrain', 'PostTrain', 'BatchTrainingService', 'InputBatch', 
-    'Input', 'TargetBatch', 'Target', 'TrainerResult', 'Trainer', 'TModel', 'Dataset', 'TrainingDataset', 'TrainingService', 'TTrainer']
+    'Input', 'TargetBatch', 'Target', 'TrainerResult', 'Trainer', 'TModel', 'Dataset', 'TrainingDataset', 'TrainingService', 'TTrainer', 'Loss', 'Losses']

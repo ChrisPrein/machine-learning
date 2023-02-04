@@ -13,9 +13,12 @@ from .trainer import Trainer
 from ..modeling.model import TInput, TTarget, TOutput
 from .training_service import Dataset, TrainingDataset, TModel, TrainingService
 
-__all__ = ['TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'PreEpoch', 'PostEpoch', 'PreTrain', 'PostTrain', 'BatchTrainingService', 'TTrainer']
+__all__ = ['TrainingContext', 'BatchTrainingPlugin', 'PreLoop', 'PostLoop', 'PreEpoch', 'PostEpoch', 'PreTrain', 'PostTrain', 'BatchTrainingService', 'TTrainer', 'Loss', 'Losses']
 
 TTrainer = TypeVar('TTrainer', bound=Trainer)
+
+Loss = Union[float, Dict[str, float]]
+Losses = Deque[Loss]
 
 @dataclass
 class TrainingContext(Generic[TInput, TTarget, TOutput, TModel, TTrainer]):
@@ -25,7 +28,7 @@ class TrainingContext(Generic[TInput, TTarget, TOutput, TModel, TTrainer]):
     current_epoch: int
     current_batch_index: int
     predictions: Deque[Prediction[TInput, TTarget, TOutput]]
-    train_losses: Deque[Union[float, Dict[str, float]]]
+    train_losses: Losses
     continue_training: bool
 
 class BatchTrainingPlugin(Generic[TInput, TTarget, TOutput, TModel, TTrainer], ABC):

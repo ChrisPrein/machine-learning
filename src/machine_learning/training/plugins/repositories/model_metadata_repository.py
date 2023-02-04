@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from ....evaluation import EvaluationResult
+from ...batch_training_service import Loss
 
 __all__ = ['ModelMetadataRepository', 'ModelMetadata']
 
 @dataclass
 class ModelMetadata:
-    loss: float
+    loss: Loss
+    validation_result: EvaluationResult
 
 class ModelMetadataRepository(ABC):
     def __init__(self):
