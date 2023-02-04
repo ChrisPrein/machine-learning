@@ -57,7 +57,7 @@ class ModelStorePlugin(PostValidationPlugin[TInput, TTarget, TOutput, TModel, TT
             self.metadata.loss = training_context.train_losses[-1]
             self.metadata.performance = validation_result
 
-            self.event_loop.create_task(self.model_repository.save(self.best_model, BEST_MODEL_NAME))
-            self.event_loop.create_task(self.metadata_repository.save(self.metadata, METADATA_NAME))
+            self.event_loop.run_until_complete(self.model_repository.save(self.best_model, BEST_MODEL_NAME))
+            self.event_loop.run_until_complete(self.metadata_repository.save(self.metadata, METADATA_NAME))
 
             logger.info('Current best model saved!')
