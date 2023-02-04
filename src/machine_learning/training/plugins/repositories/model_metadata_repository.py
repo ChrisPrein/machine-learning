@@ -8,7 +8,7 @@ __all__ = ['ModelMetadataRepository', 'ModelMetadata']
 @dataclass
 class ModelMetadata:
     loss: Loss
-    validation_result: EvaluationResult
+    performance: EvaluationResult
 
 class ModelMetadataRepository(ABC):
     def __init__(self):

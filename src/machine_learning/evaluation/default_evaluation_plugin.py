@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import *
-from .multi_evaluation_context import MultiEvaluationContext, Score
+from .multi_evaluation_context import MultiEvaluationContext
 from .evaluation_context import EvaluationContext, TModel
 from ..modeling.model import TInput, TTarget, TOutput
 
@@ -25,7 +25,7 @@ class PreLoop(DefaultEvaluationPlugin[TInput, TTarget, TOutput, TModel]):
 
 class PostLoop(DefaultEvaluationPlugin[TInput, TTarget, TOutput, TModel]):
     @abstractmethod
-    def post_loop(self, logger: Logger, evaluation_context: EvaluationContext[TInput, TTarget, TOutput, TModel], result: Dict[str, Score]): ...
+    def post_loop(self, logger: Logger, evaluation_context: EvaluationContext[TInput, TTarget, TOutput, TModel], result: Dict[str, float]): ...
 
 class PreEvaluationStep(DefaultEvaluationPlugin[TInput, TTarget, TOutput, TModel]):
     @abstractmethod

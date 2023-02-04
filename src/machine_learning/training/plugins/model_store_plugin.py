@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
 from typing import Any, Dict, Optional, TypeGuard, Union
+
 from ...evaluation.evaluation_context import TModel
 from ...modeling import TInput, TTarget, TOutput
 from ..batch_training_service import PostEpoch, TTrainer, TrainingContext
@@ -34,7 +35,7 @@ class ModelStorePlugin(PostValidationPlugin[TInput, TTarget, TOutput, TModel, TT
         self.metadata: ModelMetadata = self.event_loop.run_until_complete(self.metadata_repository.get(METADATA_NAME))
 
         if self.metadata is None:
-            self.metadata = ModelMetadata(float('inf'))
+            self.metadata = ModelMetadata(None, None)
 
     def post_validation(self, logger: Logger, training_context: TrainingContext[TInput, TTarget, TOutput, TModel, TTrainer], validation_result: EvaluationResult):
         is_nested_result: bool = is_nested_dict(validation_result)
@@ -43,14 +44,18 @@ class ModelStorePlugin(PostValidationPlugin[TInput, TTarget, TOutput, TModel, TT
             raise TypeError('Datasetname has to be set for nested validation results.')
 
         current_performance: float = validation_result[self.metric_key] if not is_nested_result else validation_result[self.dataset_name][self.metric_key]
-        best_performance: float = self.metadata.validation_result[self.metric_key] if not is_nested_result else self.metadata.validation_result[self.dataset_name][self.metric_key]
+
+        if self.metadata.performance is None:
+            best_performance: float = float("-inf")
+        else:
+            best_performance: float = self.metadata.performance[self.metric_key] if not is_nested_result else self.metadata.performance[self.dataset_name][self.metric_key]
 
         if current_performance > best_performance:
             logger.info('Saving current best model...')
 
             self.best_model = training_context.model
             self.metadata.loss = training_context.train_losses[-1]
-            self.metadata.validation_result = validation_result
+            self.metadata.performance = validation_result
 
             self.event_loop.create_task(self.model_repository.save(self.best_model, BEST_MODEL_NAME))
             self.event_loop.create_task(self.metadata_repository.save(self.metadata, METADATA_NAME))
