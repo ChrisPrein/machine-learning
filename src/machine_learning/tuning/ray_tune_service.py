@@ -1,18 +1,13 @@
-import asyncio
-from functools import partial
 from logging import Logger
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 from ray import tune
 from ray.tune.schedulers import TrialScheduler
-
-from ..modeling.model import TInput, TTarget
-from ..training import TrainingService
-from .tuning_service import Dataset, TModel, TrainingDataset, TuningService
+from .tuning_service import TuningService
 
 __all__ = ['RayTuneService']
 
-class RayTuneService(TuningService[TInput, TTarget, TModel]):
+class RayTuneService(TuningService):
     def __init__(self, scheduler: TrialScheduler, resource_config: Dict[str, Any], metric: str, mode: str, num_samples: int, logger: Optional[Logger]=None):
         super().__init__()
 
