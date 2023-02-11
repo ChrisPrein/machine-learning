@@ -38,28 +38,12 @@ class RayTuneService(TuningService[TInput, TTarget, TModel]):
         self.__num_samples = num_samples
         self.__logger = logger if not logger is None else logging.getLogger()
 
-    async def tune(self, 
-        model_factory: Callable[[], TModel], 
-        training_service_factory: Callable[[], TrainingService[TInput, TTarget, TModel]], 
-        train_dataset: TrainingDataset[TInput, TTarget], 
-        params: Dict[str, Any], 
-        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, float]]]:
-
-        if isinstance(train_dataset, tuple):
-            return await self.__tune(model_factory=model_factory, training_service_factory=training_service_factory, train_dataset=train_dataset, params=params, logger=logger)
-        else:
-            return await self.__tune(model_factory=model_factory, training_service_factory=training_service_factory, train_dataset=('dataset', train_dataset), params=params, logger=logger)
-
-    async def __tune(self, 
-        model_factory: Callable[[], TModel], 
-        training_service_factory: Callable[[], TrainingService[TInput, TTarget, TModel]], 
-        train_dataset: Tuple[str, Dataset[TInput, TTarget]], 
-        params: Dict[str, Any], 
-        logger: Optional[Logger] = None) -> Tuple[TModel, Dict[str, Dict[str, float]]]:
+    async def tune(self, training_function: Callable[[Dict[str, Any]], None], params: Dict[str, Any], logger: Optional[Logger] = None) -> None:
+        logger = logger if not logger is None else self.__logger
 
         tuner = tune.Tuner(
             tune.with_resources(
-                tune.with_parameters(partial(self.__train(model_factory=model_factory, training_service_factory=training_service_factory, train_dataset=train_dataset, logger=logger))),
+                tune.with_parameters(training_function),
                 resources=self.__resource_config,
             ),
             tune_config=tune.TuneConfig(
@@ -67,25 +51,12 @@ class RayTuneService(TuningService[TInput, TTarget, TModel]):
                 mode=self.__mode,
                 scheduler=self.__scheduler,
                 num_samples=self.__num_samples
-            )
+            ),
+            param_space=params
         )
+
+        self.__logger.info('Starting hyperparameter tuning...')
 
         results = tuner.fit()
 
-        return results
-
-    def __train(self, 
-        config, 
-        model_factory: Callable[[], TModel], 
-        training_service_factory: Callable[[], TrainingService[TInput, TTarget, TModel]], 
-        train_dataset: Tuple[str, Dataset[TInput, TTarget]], 
-        logger: Optional[Logger] = None):
-
-        logger = logger if not logger is None else self.__logger
-
-        model: TModel = model_factory(**config["model"])
-        training_service: TrainingService[TInput, TTarget, TModel] = training_service_factory(**config["training_service"])
-
-        event_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-
-        event_loop.run_until_complete(training_service.train(model, train_dataset, logger))
+        self.__logger.info('Finished hyperparameter tuning.')
