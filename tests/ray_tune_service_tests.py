@@ -34,15 +34,19 @@ class RayTuneServiceTestCase(unittest.TestCase):
             "test": tune.grid_search([1, 2, 3])
         }
 
+        tune_config = tune.TuneConfig(
+            metric='loss',
+            mode='min',
+            num_samples=1,
+            scheduler=scheduler,
+        )
+
         def training_function(config):
             test = 1
 
         tuning_service: TuningService = RayTuneService(
-            scheduler=scheduler, 
             resource_config=resource_config,
-            metric='loss',
-            mode='min',
-            num_samples=1
+            tune_config=tune_config
         )
 
         self.event_loop.run_until_complete(tuning_service.tune(training_function=training_function, params=params))

@@ -8,29 +8,17 @@ from .tuning_service import TuningService
 __all__ = ['RayTuneService']
 
 class RayTuneService(TuningService):
-    def __init__(self, scheduler: TrialScheduler, resource_config: Dict[str, Any], metric: str, mode: str, num_samples: int, logger: Optional[Logger]=None):
+    def __init__(self, resource_config: Dict[str, Any], tune_config: tune.TuneConfig, logger: Optional[Logger]=None):
         super().__init__()
-
-        if scheduler is None:
-            raise TypeError('scheduler')
 
         if resource_config is None:
             raise TypeError('resource_config')
 
-        if metric is None:
-            raise TypeError('metric')
+        if tune_config is None:
+            raise TypeError('tune_config')
 
-        if mode is None:
-            raise TypeError('mode')
-
-        if num_samples is None:
-            raise TypeError('num_samples')
-
-        self.__scheduler = scheduler
         self.__resource_config = resource_config
-        self.__metric = metric
-        self.__mode = mode
-        self.__num_samples = num_samples
+        self.__tune_config = tune_config
         self.__logger = logger if not logger is None else logging.getLogger()
 
     async def tune(self, training_function: Callable[[Dict[str, Any]], None], params: Dict[str, Any], logger: Optional[Logger] = None) -> None:
@@ -41,13 +29,8 @@ class RayTuneService(TuningService):
                 tune.with_parameters(training_function),
                 resources=self.__resource_config,
             ),
-            tune_config=tune.TuneConfig(
-                metric=self.__metric,
-                mode=self.__mode,
-                scheduler=self.__scheduler,
-                num_samples=self.__num_samples
-            ),
-            param_space=params
+            tune_config=self.__tune_config,
+            param_space=params,
         )
 
         self.__logger.info('Starting hyperparameter tuning...')
