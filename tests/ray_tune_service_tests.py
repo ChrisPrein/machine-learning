@@ -12,6 +12,7 @@ from src.machine_learning.training import *
 from src.machine_learning.tuning import RayTuneService, TuningService
 from ray.tune.schedulers import ASHAScheduler
 import ray.tune as tune
+from ray.air.config import RunConfig, ScalingConfig
 
 class RayTuneServiceTestCase(unittest.TestCase):
     def setUp(self):
@@ -41,12 +42,17 @@ class RayTuneServiceTestCase(unittest.TestCase):
             scheduler=scheduler,
         )
 
+        run_config = RunConfig(
+            name="test"
+        )
+
         def training_function(config):
             test = 1
 
         tuning_service: TuningService = RayTuneService(
             resource_config=resource_config,
-            tune_config=tune_config
+            tune_config=tune_config,
+            run_config=run_config
         )
 
         self.event_loop.run_until_complete(tuning_service.tune(training_function=training_function, params=params))
