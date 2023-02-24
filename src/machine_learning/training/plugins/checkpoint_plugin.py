@@ -39,6 +39,7 @@ class CheckpointPlugin(PostEpoch[TInput, TTarget, TOutput, TModel, TTrainer], Pr
 
         self.event_loop.create_task(self.training_checkpoint_repository.save(self.checkpoint, LATEST_TRAINING_CHECKPOINT_NAME))
         self.event_loop.create_task(self.model_checkpoint_repository.save(training_context.model, LATEST_MODEL_NAME))
+        self.event_loop.create_task(self.trainer_repository.save(training_context.trainer, LATEST_TRAINER_NAME))
 
         logger.info('Checkpoint created!')
 
