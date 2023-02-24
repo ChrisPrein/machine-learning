@@ -29,7 +29,7 @@ class ModelMetadataWandBRepository(ModelMetadataRepository):
             return self.cache[name]
 
         try:
-            file_path: Path = self.files_dir / name
+            file_path: Path = self.files_dir / self.get_file_name(name)
 
             content_dict: Dict[str, Any] = json.load(str(file_path))
 
