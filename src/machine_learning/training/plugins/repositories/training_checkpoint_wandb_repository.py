@@ -16,6 +16,7 @@ class TrainingCheckpointWandBRepository(TrainingCheckpointRepository):
 
         self.run: Run = run
         self.cache: Dict[str, TrainingCheckpoint] = {}
+        self.files_dir: Path = Path(self.run.settings.files_dir)
 
     def get_file_name(self, name) -> str:
         return f'{name}.json'
@@ -28,9 +29,9 @@ class TrainingCheckpointWandBRepository(TrainingCheckpointRepository):
             return self.cache[name]
 
         try:
-            checkpoint_file = self.run.restore(self.get_file_name(name))
+            file_path: Path = self.files_dir / name
 
-            content_dict: Dict[str, Any] = json.load(checkpoint_file)
+            content_dict: Dict[str, Any] = json.load(str(file_path))
 
             training_checkpoint: TrainingCheckpoint = TrainingCheckpoint(**content_dict)
 
