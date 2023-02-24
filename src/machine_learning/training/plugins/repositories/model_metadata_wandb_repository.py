@@ -31,7 +31,7 @@ class ModelMetadataWandBRepository(ModelMetadataRepository):
         try:
             file_path: Path = self.files_dir / self.get_file_name(name)
 
-            content_dict: Dict[str, Any] = json.load(str(file_path))
+            content_dict: Dict[str, Any] = json.load(file_path.open())
 
             model_metadata: ModelMetadata = ModelMetadata(**content_dict)
 
