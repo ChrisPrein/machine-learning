@@ -26,7 +26,7 @@ class TunerWandBRepository(TunerRepository):
         try:
             experiment_dir: Path = self.files_dir / name
 
-            if not experiment_dir.is_dir() or len(list(experiment_dir.rglob('*'))):
+            if not experiment_dir.is_dir() or len(list(experiment_dir.rglob('*'))) > 2:
                 return None
 
             tuner: Tuner = Tuner.restore(str(experiment_dir))
