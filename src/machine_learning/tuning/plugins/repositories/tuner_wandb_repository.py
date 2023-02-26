@@ -26,8 +26,8 @@ class TunerWandBRepository(TunerRepository):
         try:
             experiment_dir: Path = self.files_dir / name
 
-            if not experiment_dir.is_dir():
-                raise FileNotFoundError('Experiment directory not found.')
+            if not experiment_dir.is_dir() or len(list(experiment_dir.rglob('*'))):
+                return None
 
             tuner: Tuner = Tuner.restore(str(experiment_dir))
 

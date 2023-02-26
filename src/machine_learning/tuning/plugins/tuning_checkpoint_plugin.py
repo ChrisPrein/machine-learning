@@ -15,6 +15,9 @@ class TuningCheckpointPlugin(PreTune):
     def pre_tune(self, logger: Logger, tuning_context: TuningContext):
         logger.info('Loading tuner checkpoint...')
 
-        tuning_context.tuner = self.event_loop.run_until_complete(self.tuner_repository.get(tuning_context.run_config.name))
+        tuner = self.event_loop.run_until_complete(self.tuner_repository.get(tuning_context.run_config.name))
+
+        if tuner != None:
+            tuning_context.tuner = tuner
 
         logger.info('Tuner checkpoint loaded!')
