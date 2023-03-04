@@ -29,7 +29,7 @@ class TunerWandBRepository(TunerRepository):
             if not experiment_dir.is_dir() or len(list(experiment_dir.rglob('*'))) <= 2:
                 return None
 
-            tuner: Tuner = Tuner.restore(str(experiment_dir))
+            tuner: Tuner = Tuner.restore(str(experiment_dir), resume_errored=True)
 
             self.cache[name] = tuner
 
